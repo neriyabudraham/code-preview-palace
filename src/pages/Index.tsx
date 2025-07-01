@@ -2,9 +2,11 @@
 import { useState } from "react";
 import { HtmlEditor } from "@/components/HtmlEditor";
 import { ProjectManager } from "@/components/ProjectManager";
+import { PublishedPagesManager } from "@/components/PublishedPagesManager";
+import { CustomDomainManager } from "@/components/CustomDomainManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Code, FolderOpen, LogOut, User } from "lucide-react";
+import { Code, FolderOpen, LogOut, User, Globe2, Globe } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
@@ -68,7 +70,7 @@ const Index = () => {
       
       <div className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-gray-800 border-gray-700">
+          <TabsList className="grid w-full grid-cols-4 bg-gray-800 border-gray-700">
             <TabsTrigger value="editor" className="flex items-center gap-2">
               <Code size={16} />
               עריכה
@@ -76,6 +78,14 @@ const Index = () => {
             <TabsTrigger value="projects" className="flex items-center gap-2">
               <FolderOpen size={16} />
               הפרויקטים שלי
+            </TabsTrigger>
+            <TabsTrigger value="published" className="flex items-center gap-2">
+              <Globe2 size={16} />
+              דפים מפורסמים
+            </TabsTrigger>
+            <TabsTrigger value="domain" className="flex items-center gap-2">
+              <Globe size={16} />
+              דומיין מותאם
             </TabsTrigger>
           </TabsList>
           
@@ -85,6 +95,14 @@ const Index = () => {
           
           <TabsContent value="projects" className="mt-6">
             <ProjectManager onEditProject={handleEditProject} />
+          </TabsContent>
+          
+          <TabsContent value="published" className="mt-6">
+            <PublishedPagesManager />
+          </TabsContent>
+          
+          <TabsContent value="domain" className="mt-6">
+            <CustomDomainManager />
           </TabsContent>
         </Tabs>
       </div>

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Copy, ExternalLink, Share2, Globe, CheckCircle, Link, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface PublishDialogProps {
   open: boolean;
@@ -19,7 +20,39 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
   const [isPublishing, setIsPublishing] = useState(false);
   const [isRepublishing, setIsRepublishing] = useState(false);
   const [isUpdatingExisting, setIsUpdatingExisting] = useState(false);
+  const [userDomain, setUserDomain] = useState<string | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  // Load user's custom domain
+  useEffect(() => {
+    const loadUserDomain = async () => {
+      if (!user) return;
+
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('custom_domain, domain_verified')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error loading profile:', error);
+          return;
+        }
+
+        if (profile && profile.custom_domain && profile.domain_verified) {
+          setUserDomain(profile.custom_domain);
+        }
+      } catch (error) {
+        console.error('Error in loadUserDomain:', error);
+      }
+    };
+
+    if (open) {
+      loadUserDomain();
+    }
+  }, [open, user]);
 
   // Initialize the dialog state when it opens
   useEffect(() => {
@@ -98,7 +131,9 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
       const publishedPageData = {
         title,
         html_content: project.html,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        // Add custom domain if user has one
+        custom_domain: userDomain
       };
 
       console.log('Republishing page data:', publishedPageData);
@@ -209,7 +244,9 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
         slug,
         title,
         html_content: project.html,
-        project_id: project.id
+        project_id: project.id,
+        // Add custom domain if user has one
+        custom_domain: userDomain
         // Remove user_id field since we want to allow anonymous publishing
       };
 
@@ -247,8 +284,10 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
         throw result.error;
       }
 
-      // Generate the custom URL
-      const url = `https://page.neriyabudraham.co.il/${slug}`;
+      // Generate the URL - use custom domain if available, otherwise use default
+      const url = userDomain 
+        ? `https://${userDomain}/${slug}` 
+        : `https://page.neriyabudraham.co.il/${slug}`;
       setPublishedUrl(url);
       
       // Update project in localStorage
@@ -349,6 +388,17 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
                 )}
               </div>
             </div>
+            
+            {userDomain && (
+              <div className="mt-3 p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700">
+                <div className="flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                    יפורסם בדומיין המותאם שלך: {userDomain}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {!publishedUrl || !isUpdatingExisting ? (
@@ -361,7 +411,9 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
                   {isUpdatingExisting ? "עדכן כתובת מותאמת אישית" : "הגדר כתובת מותאמת אישית"}
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400 text-sm max-w-sm mx-auto">
-                  הפרויקט יפורסם תחת הדומיין שלך עם הסיומת שתבחר
+                  {userDomain 
+                    ? `הפרויקט יפורסם תחת הדומיין שלך: ${userDomain}` 
+                    : "הפרויקט יפורסם תחת הדומיין הברירת מחדל"}
                 </p>
               </div>
 
@@ -372,7 +424,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
                   </label>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-600 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-lg border">
-                      https://page.neriyabudraham.co.il/
+                      https://{userDomain || 'page.neriyabudraham.co.il'}/
                     </span>
                     <Input 
                       value={customSlug} 
@@ -421,7 +473,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
                   {isUpdatingExisting ? "עודכן בהצלחה! 🎉" : "פורסם בהצלחה! 🎉"}
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400">
-                  הפרויקט שלך זמין כעת בכתובת המותאמת אישית
+                  הפרויקט שלך זמין כעת {userDomain ? "בדומיין המותאם שלך" : "בכתובת המותאמת אישית"}
                 </p>
               </div>
               
