@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { ExternalLink, Trash2, Globe, Calendar, Copy } from "lucide-react";
+import { ExternalLink, Trash2, Globe, Calendar, Copy, Save, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,8 +19,17 @@ interface PublishedPage {
   custom_domain?: string;
 }
 
+interface DraftProject {
+  id: string;
+  htmlCode: string;
+  fileName: string;
+  savedAt: string;
+  isDraft: true;
+}
+
 export const PublishedPagesManager = () => {
   const [publishedPages, setPublishedPages] = useState<PublishedPage[]>([]);
+  const [drafts, setDrafts] = useState<DraftProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deletingPageId, setDeletingPageId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -33,7 +42,24 @@ export const PublishedPagesManager = () => {
     } else {
       setIsLoading(false);
     }
+    loadDrafts();
   }, [user]);
+
+  const loadDrafts = () => {
+    // Load draft from localStorage
+    const savedDraft = localStorage.getItem("editorDraft");
+    if (savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft);
+        setDrafts([draft]);
+      } catch (error) {
+        console.error("Error loading draft:", error);
+        setDrafts([]);
+      }
+    } else {
+      setDrafts([]);
+    }
+  };
 
   const loadPublishedPages = async () => {
     if (!user) {
@@ -64,6 +90,82 @@ export const PublishedPagesManager = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const saveProjectFromPublished = async (page: PublishedPage) => {
+    try {
+      // Get the HTML content from the published page
+      const { data, error } = await supabase
+        .from('published_pages')
+        .select('html_content')
+        .eq('id', page.id)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      // Save to localStorage as a new project
+      const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
+      const newProject = {
+        id: Date.now().toString(),
+        name: `${page.title} (שוחזר)`,
+        html: data.html_content,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        versions: []
+      };
+
+      savedProjects.push(newProject);
+      localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
+
+      toast({
+        title: "פרויקט נשמר!",
+        description: `הפרויקט "${page.title}" נשמר בהצלחה למחשב`,
+      });
+
+    } catch (error) {
+      console.error('Error saving project:', error);
+      toast({
+        title: "שגיאה",
+        description: "לא ניתן לשמור את הפרויקט",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const saveProjectFromDraft = (draft: DraftProject) => {
+    try {
+      const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
+      const newProject = {
+        id: Date.now().toString(),
+        name: draft.fileName,
+        html: draft.htmlCode,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        versions: []
+      };
+
+      savedProjects.push(newProject);
+      localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
+
+      // Remove the draft after saving
+      localStorage.removeItem("editorDraft");
+      setDrafts([]);
+
+      toast({
+        title: "טיוטה נשמרה!",
+        description: `הטיוטה "${draft.fileName}" נשמרה כפרויקט`,
+      });
+
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      toast({
+        title: "שגיאה",
+        description: "לא ניתן לשמור את הטיוטה",
+        variant: "destructive"
+      });
     }
   };
 
@@ -180,13 +282,15 @@ export const PublishedPagesManager = () => {
     );
   }
 
-  if (publishedPages.length === 0) {
+  const totalItems = publishedPages.length + drafts.length;
+
+  if (totalItems === 0) {
     return (
       <Card className="p-8 bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800 border-slate-700 text-center shadow-xl">
         <Globe className="mx-auto mb-4 text-slate-400" size={48} />
         <h3 className="text-xl font-bold text-white mb-2">אין דפים מפורסמים</h3>
         <p className="text-slate-400">
-          עדיין לא פרסמת דפים. פרסם דף ראשון מהעורך!
+          עדיין לא פרסמת דפים ולא נשמרו טיוטות. פרסם דף ראשון מהעורך!
         </p>
       </Card>
     );
@@ -195,13 +299,58 @@ export const PublishedPagesManager = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">דפים מפורסמים</h2>
-        <Badge variant="secondary" className="bg-slate-700/50 text-slate-300 px-3 py-1">
-          {publishedPages.length} דפים
-        </Badge>
+        <h2 className="text-2xl font-bold text-white">דפים מפורסמים וטיוטות</h2>
+        <div className="flex gap-2">
+          {publishedPages.length > 0 && (
+            <Badge variant="secondary" className="bg-slate-700/50 text-slate-300 px-3 py-1">
+              {publishedPages.length} מפורסמים
+            </Badge>
+          )}
+          {drafts.length > 0 && (
+            <Badge variant="outline" className="border-amber-400 text-amber-400 px-3 py-1">
+              {drafts.length} טיוטות
+            </Badge>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Show drafts first */}
+        {drafts.map((draft) => (
+          <Card key={draft.id} className="bg-gradient-to-br from-amber-900/20 via-amber-800/20 to-amber-900/20 border-amber-700/50 hover:shadow-xl transition-all duration-300">
+            <div className="p-5 space-y-4">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText size={16} className="text-amber-400" />
+                  <h3 className="font-bold text-white text-lg truncate">{draft.fileName}</h3>
+                  <Badge variant="outline" className="text-xs border-amber-400 text-amber-400 ml-auto">
+                    טיוטה - שמירה אוטומטית
+                  </Badge>
+                </div>
+              </div>
+              
+              <div className="text-xs text-slate-500 space-y-1">
+                <div className="flex items-center gap-1">
+                  <Calendar size={12} />
+                  <span>נשמר: {formatDate(draft.savedAt)}</span>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => saveProjectFromDraft(draft)}
+                  className="flex-1 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white shadow-lg transition-all duration-200 font-semibold"
+                >
+                  <Save size={14} className="mr-1" />
+                  שמור פרויקט
+                </Button>
+              </div>
+            </div>
+          </Card>
+        ))}
+
+        {/* Show published pages */}
         {publishedPages.map((page) => {
           const fullUrl = getPublishedUrl(page);
           return (
@@ -251,6 +400,15 @@ export const PublishedPagesManager = () => {
                   >
                     <ExternalLink size={14} className="mr-1" />
                     פתח
+                  </Button>
+                  
+                  <Button
+                    size="sm"
+                    onClick={() => saveProjectFromPublished(page)}
+                    variant="outline"
+                    className="border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white px-3"
+                  >
+                    <Save size={14} />
                   </Button>
                   
                   <AlertDialog>

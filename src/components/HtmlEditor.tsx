@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ export const HtmlEditor = () => {
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [isProjectPublished, setIsProjectPublished] = useState(false);
   const [currentDraft, setCurrentDraft] = useState<any>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const { toast } = useToast();
   
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -33,20 +35,34 @@ export const HtmlEditor = () => {
     return project && (project.publishedUrl || project.customSlug);
   }, []);
 
-  // Save editor state to localStorage as draft
-  const saveDraft = useCallback(() => {
-    if (htmlCode.trim() || fileName.trim()) {
+  // Save draft only when exiting without saving
+  const saveDraftOnExit = useCallback(() => {
+    if (hasUnsavedChanges && (htmlCode.trim() || fileName.trim())) {
       const draft = {
         id: currentProjectId || 'draft_' + Date.now(),
         htmlCode,
-        fileName,
+        fileName: fileName || 'טיוטה - שמירה אוטומטית',
         savedAt: new Date().toISOString(),
         isDraft: true
       };
       localStorage.setItem("editorDraft", JSON.stringify(draft));
-      setCurrentDraft(draft);
+      console.log('Draft saved on exit:', draft);
     }
-  }, [htmlCode, fileName, currentProjectId]);
+  }, [htmlCode, fileName, currentProjectId, hasUnsavedChanges]);
+
+  // Set up beforeunload event to save draft when leaving
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      saveDraftOnExit();
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [saveDraftOnExit, hasUnsavedChanges]);
 
   // Auto-save function
   const autoSave = useCallback(async () => {
@@ -133,6 +149,7 @@ export const HtmlEditor = () => {
 
       localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
       lastSavedContentRef.current = htmlCode;
+      setHasUnsavedChanges(false);
       
       // Clear draft after successful save
       localStorage.removeItem("editorDraft");
@@ -152,11 +169,15 @@ export const HtmlEditor = () => {
     }
   }, [htmlCode, fileName, currentProjectId, isEditingExisting, toast, checkIfProjectIsPublished]);
 
-  // Set up auto-save and draft save when content changes
+  // Track changes to mark unsaved changes
   useEffect(() => {
-    // Save as draft
-    saveDraft();
+    if (htmlCode !== lastSavedContentRef.current) {
+      setHasUnsavedChanges(true);
+    }
+  }, [htmlCode, fileName]);
 
+  // Set up auto-save when content changes
+  useEffect(() => {
     if (!htmlCode.trim() || !fileName.trim()) return;
 
     // Clear existing timeout
@@ -175,7 +196,7 @@ export const HtmlEditor = () => {
         clearTimeout(autoSaveTimeoutRef.current);
       }
     };
-  }, [htmlCode, fileName, autoSave, saveDraft]);
+  }, [htmlCode, fileName, autoSave]);
 
   useEffect(() => {
     // Check if there's an editing project in sessionStorage (from project manager)
@@ -190,6 +211,7 @@ export const HtmlEditor = () => {
         setLastSavedProject(project);
         setIsProjectPublished(checkIfProjectIsPublished(project.id));
         lastSavedContentRef.current = project.html;
+        setHasUnsavedChanges(false);
         // Clear the sessionStorage after loading
         sessionStorage.removeItem("editingProject");
         
@@ -211,6 +233,7 @@ export const HtmlEditor = () => {
     setLastSavedProject(null);
     setIsProjectPublished(false);
     lastSavedContentRef.current = "";
+    setHasUnsavedChanges(false);
     
     // Check if there's a draft to restore
     const savedDraft = localStorage.getItem("editorDraft");
@@ -233,9 +256,9 @@ export const HtmlEditor = () => {
   };
 
   const handleNewPage = () => {
-    // Save current work as draft if there's content
-    if (htmlCode.trim() || fileName.trim()) {
-      saveDraft();
+    // Save current work as draft if there are unsaved changes
+    if (hasUnsavedChanges) {
+      saveDraftOnExit();
       toast({
         title: "טיוטה נשמרה",
         description: "העבודה הנוכחית נשמרה כטיוטה",
@@ -249,6 +272,7 @@ export const HtmlEditor = () => {
     setLastSavedProject(null);
     setIsProjectPublished(false);
     lastSavedContentRef.current = "";
+    setHasUnsavedChanges(false);
     
     toast({
       title: "דף חדש",
@@ -262,6 +286,7 @@ export const HtmlEditor = () => {
       setFileName(currentDraft.fileName);
       setCurrentProjectId(currentDraft.id.startsWith('draft_') ? null : currentDraft.id);
       setIsEditingExisting(!currentDraft.id.startsWith('draft_'));
+      setHasUnsavedChanges(true);
       
       toast({
         title: "טיוטה שוחזרה",
@@ -332,6 +357,7 @@ export const HtmlEditor = () => {
     setLastSavedProject(null);
     setIsProjectPublished(false);
     lastSavedContentRef.current = "";
+    setHasUnsavedChanges(true);
     
     toast({
       title: "שוכפל בהצלחה",
@@ -347,6 +373,7 @@ export const HtmlEditor = () => {
     setLastSavedProject(null);
     setIsProjectPublished(false);
     lastSavedContentRef.current = "";
+    setHasUnsavedChanges(false);
     
     toast({
       title: "אופס!",
@@ -373,8 +400,9 @@ export const HtmlEditor = () => {
     return "פרסום";
   };
 
-  const isContentEmpty = !htmlCode.trim();
-  const canSaveOrPublish = !isContentEmpty && fileName.trim();
+  // Fix the content empty check
+  const isContentEmpty = !htmlCode.trim() && !fileName.trim();
+  const canSaveOrPublish = htmlCode.trim() && fileName.trim();
 
   return (
     <div className="space-y-6">
@@ -439,7 +467,7 @@ export const HtmlEditor = () => {
           </Button>
         </div>
         
-        {/* Draft section */}
+        {/* Draft section - only show if there's a draft */}
         {currentDraft && (
           <div className="bg-amber-900/40 border border-amber-700/50 rounded-xl p-4 text-amber-200 text-sm mb-4 backdrop-blur-sm">
             <div className="flex items-center justify-between">
@@ -481,6 +509,11 @@ export const HtmlEditor = () => {
                 {isProjectPublished && (
                   <Badge variant="outline" className="mr-2 border-orange-400 text-orange-400">
                     מפורסם
+                  </Badge>
+                )}
+                {hasUnsavedChanges && (
+                  <Badge variant="outline" className="mr-2 border-yellow-400 text-yellow-400">
+                    יש שינויים לא שמורים
                   </Badge>
                 )}
               </div>
