@@ -45,14 +45,14 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Initialize Supabase client
+    // Initialize Supabase client with service role key for unrestricted access
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     console.log('Supabase URL configured:', !!supabaseUrl);
-    console.log('Supabase Key configured:', !!supabaseKey);
+    console.log('Supabase Service Key configured:', !!supabaseServiceKey);
     
-    if (!supabaseUrl || !supabaseKey) {
+    if (!supabaseUrl || !supabaseServiceKey) {
       console.error('Missing Supabase configuration');
       return new Response('Server configuration error', { 
         status: 500,
@@ -60,9 +60,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get the published page by slug
+    // Get the published page by slug using service role to bypass RLS
     console.log('Querying for slug:', slug);
     const { data: page, error } = await supabase
       .from('published_pages')

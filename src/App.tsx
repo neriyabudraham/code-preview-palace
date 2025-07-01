@@ -15,11 +15,11 @@ const App = () => {
   const isRootPath = currentPath === '/';
   const isPotentialPublishedPage = !isRootPath && !currentPath.startsWith('/_');
 
-  // If it might be a published page, redirect to the serve-page function
+  // If it might be a published page, redirect immediately without showing anything
   if (isPotentialPublishedPage) {
     const slug = currentPath.substring(1); // Remove leading slash
-    window.location.href = `https://sojhyduhenphvbxvjvpv.supabase.co/functions/v1/serve-page/${slug}`;
-    return <div>מפנה לדף...</div>;
+    window.location.replace(`https://sojhyduhenphvbxvjvpv.supabase.co/functions/v1/serve-page/${slug}`);
+    return null; // Don't render anything during redirect
   }
 
   return (
