@@ -17,6 +17,7 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url)
     console.log('URL pathname:', url.pathname);
+    console.log('Request headers:', Object.fromEntries(req.headers.entries()));
     
     // Extract slug from pathname more reliably
     const pathParts = url.pathname.split('/').filter(part => part.length > 0);
@@ -89,7 +90,8 @@ Deno.serve(async (req) => {
         status: 404,
         headers: { 
           'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache',
+          ...corsHeaders
         }
       });
     }
@@ -106,7 +108,8 @@ Deno.serve(async (req) => {
       return new Response('Server configuration error', { 
         status: 500,
         headers: {
-          'Content-Type': 'text/html; charset=utf-8'
+          'Content-Type': 'text/html; charset=utf-8',
+          ...corsHeaders
         }
       });
     }
@@ -134,7 +137,8 @@ Deno.serve(async (req) => {
       return new Response('Database error', { 
         status: 500,
         headers: {
-          'Content-Type': 'text/html; charset=utf-8'
+          'Content-Type': 'text/html; charset=utf-8',
+          ...corsHeaders
         }
       });
     }
@@ -202,20 +206,41 @@ Deno.serve(async (req) => {
         status: 404,
         headers: { 
           'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache',
+          ...corsHeaders
         }
       });
     }
 
     console.log('Serving page for slug:', slug);
+    console.log('HTML content length:', page.html_content.length);
+    console.log('HTML content preview:', page.html_content.substring(0, 200));
     
-    // Return the HTML content with proper headers
-    return new Response(page.html_content, {
+    // Ensure proper HTML structure and encoding
+    let htmlContent = page.html_content;
+    
+    // Make sure we have proper DOCTYPE and charset
+    if (!htmlContent.includes('<!DOCTYPE html>')) {
+      htmlContent = '<!DOCTYPE html>\n' + htmlContent;
+    }
+    
+    // Ensure UTF-8 charset is properly set
+    if (!htmlContent.includes('<meta charset="UTF-8">') && !htmlContent.includes('charset=utf-8')) {
+      htmlContent = htmlContent.replace(
+        '<head>',
+        '<head>\n  <meta charset="UTF-8">'
+      );
+    }
+    
+    // Return the HTML content with all necessary headers
+    return new Response(htmlContent, {
       status: 200,
       headers: { 
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'public, max-age=300',
-        'Access-Control-Allow-Origin': '*'
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'self' 'unsafe-inline' 'unsafe-eval' *; script-src 'self' 'unsafe-inline' 'unsafe-eval' *; style-src 'self' 'unsafe-inline' *;",
+        ...corsHeaders
       }
     });
 
@@ -268,7 +293,8 @@ Deno.serve(async (req) => {
     return new Response(errorHtml, { 
       status: 500,
       headers: { 
-        'Content-Type': 'text/html; charset=utf-8'
+        'Content-Type': 'text/html; charset=utf-8',
+        ...corsHeaders
       }
     });
   }

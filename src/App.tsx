@@ -10,18 +10,6 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => {
-  // Check if this is a potential published page request
-  const currentPath = window.location.pathname;
-  const isRootPath = currentPath === '/';
-  const isPotentialPublishedPage = !isRootPath && !currentPath.startsWith('/_');
-
-  // If it might be a published page, redirect immediately without showing anything
-  if (isPotentialPublishedPage) {
-    const slug = currentPath.substring(1); // Remove leading slash
-    window.location.replace(`https://sojhyduhenphvbxvjvpv.supabase.co/functions/v1/serve-page/${slug}`);
-    return null; // Don't render anything during redirect
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
