@@ -1,10 +1,12 @@
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { CodeEditor } from "./CodeEditor";
 import { HtmlPreview } from "./HtmlPreview";
-import { Save, Play, RotateCcw, Copy } from "lucide-react";
+import { PublishDialog } from "./PublishDialog";
+import { Save, Play, RotateCcw, Copy, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const EMPTY_HTML = `<!DOCTYPE html>
@@ -99,10 +101,26 @@ export const HtmlEditor = () => {
   const [isEditingExisting, setIsEditingExisting] = useState(false);
   const [isSampleMode, setIsSampleMode] = useState(true);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [lastSavedProject, setLastSavedProject] = useState<any>(null);
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
   const { toast } = useToast();
   
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef<string>("");
+
+  // Save editor state to localStorage
+  const saveEditorState = useCallback(() => {
+    if (!isSampleMode) {
+      const editorState = {
+        htmlCode,
+        fileName,
+        currentProjectId,
+        isEditingExisting,
+        isSampleMode: false
+      };
+      localStorage.setItem("editorState", JSON.stringify(editorState));
+    }
+  }, [htmlCode, fileName, currentProjectId, isEditingExisting, isSampleMode]);
 
   // Auto-save function
   const autoSave = useCallback(async () => {
@@ -115,10 +133,22 @@ export const HtmlEditor = () => {
       return;
     }
 
+    // Check for duplicate names
+    const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
+    const existingProject = savedProjects.find((p: any) => p.name === fileName && p.id !== currentProjectId);
+    
+    if (existingProject) {
+      toast({
+        title: "שם כבר קיים",
+        description: "פרויקט עם השם הזה כבר קיים. אנא בחר שם אחר.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsAutoSaving(true);
     
     try {
-      const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
       const now = new Date().toISOString();
       
       if (isEditingExisting && currentProjectId) {
@@ -174,17 +204,26 @@ export const HtmlEditor = () => {
       localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
       lastSavedContentRef.current = htmlCode;
       
+      // Set last saved project for publish functionality
+      const currentProject = savedProjects.find((p: any) => p.id === currentProjectId || p.name === fileName);
+      if (currentProject) {
+        setLastSavedProject(currentProject);
+      }
+      
       console.log("Auto-saved successfully");
     } catch (error) {
       console.error("Auto-save failed:", error);
     } finally {
       setIsAutoSaving(false);
     }
-  }, [htmlCode, fileName, currentProjectId, isEditingExisting, isSampleMode]);
+  }, [htmlCode, fileName, currentProjectId, isEditingExisting, isSampleMode, toast]);
 
   // Set up auto-save when content changes
   useEffect(() => {
     if (isSampleMode) return;
+
+    // Save editor state
+    saveEditorState();
 
     // Clear existing timeout
     if (autoSaveTimeoutRef.current) {
@@ -202,10 +241,10 @@ export const HtmlEditor = () => {
         clearTimeout(autoSaveTimeoutRef.current);
       }
     };
-  }, [htmlCode, fileName, autoSave, isSampleMode]);
+  }, [htmlCode, fileName, autoSave, isSampleMode, saveEditorState]);
 
   useEffect(() => {
-    // Check if there's an editing project in sessionStorage
+    // Check if there's an editing project in sessionStorage (from project manager)
     const editingProject = sessionStorage.getItem("editingProject");
     if (editingProject) {
       try {
@@ -215,6 +254,7 @@ export const HtmlEditor = () => {
         setCurrentProjectId(project.id);
         setIsEditingExisting(true);
         setIsSampleMode(false);
+        setLastSavedProject(project);
         lastSavedContentRef.current = project.html;
         // Clear the sessionStorage after loading
         sessionStorage.removeItem("editingProject");
@@ -223,17 +263,44 @@ export const HtmlEditor = () => {
           title: "פרויקט נטען",
           description: `הפרויקט "${project.name}" נטען לעריכה`,
         });
+        return;
       } catch (error) {
         console.error("Error loading project:", error);
       }
-    } else {
-      // Show sample page when entering fresh
-      setHtmlCode(SAMPLE_HTML);
-      setFileName("");
-      setCurrentProjectId(null);
-      setIsEditingExisting(false);
-      setIsSampleMode(true);
     }
+
+    // Check if there's a saved editor state
+    const savedEditorState = localStorage.getItem("editorState");
+    if (savedEditorState) {
+      try {
+        const editorState = JSON.parse(savedEditorState);
+        setHtmlCode(editorState.htmlCode);
+        setFileName(editorState.fileName);
+        setCurrentProjectId(editorState.currentProjectId);
+        setIsEditingExisting(editorState.isEditingExisting);
+        setIsSampleMode(false);
+        lastSavedContentRef.current = editorState.htmlCode;
+        
+        // Find the project for publish functionality
+        const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
+        const currentProject = savedProjects.find((p: any) => p.id === editorState.currentProjectId);
+        if (currentProject) {
+          setLastSavedProject(currentProject);
+        }
+        
+        return;
+      } catch (error) {
+        console.error("Error loading editor state:", error);
+      }
+    }
+
+    // Show sample page when entering fresh
+    setHtmlCode(SAMPLE_HTML);
+    setFileName("");
+    setCurrentProjectId(null);
+    setIsEditingExisting(false);
+    setIsSampleMode(true);
+    setLastSavedProject(null);
   }, [toast]);
 
   const handleCodeChange = (newCode: string) => {
@@ -259,7 +326,9 @@ export const HtmlEditor = () => {
     setCurrentProjectId(null);
     setIsEditingExisting(false);
     setIsSampleMode(false);
+    setLastSavedProject(null);
     lastSavedContentRef.current = "";
+    localStorage.removeItem("editorState");
     toast({
       title: "דף חדש",
       description: "נוצר דף חדש",
@@ -308,6 +377,7 @@ export const HtmlEditor = () => {
     setFileName(duplicateName);
     setCurrentProjectId(null);
     setIsEditingExisting(false);
+    setLastSavedProject(null);
     lastSavedContentRef.current = "";
     
     toast({
@@ -322,36 +392,82 @@ export const HtmlEditor = () => {
     setCurrentProjectId(null);
     setIsEditingExisting(false);
     setIsSampleMode(true);
+    setLastSavedProject(null);
     lastSavedContentRef.current = "";
+    localStorage.removeItem("editorState");
     toast({
       title: "אופס!",
       description: "הקוד אופס למצב הבסיסי",
     });
   };
 
+  const handlePublish = () => {
+    if (!lastSavedProject) {
+      toast({
+        title: "שגיאה",
+        description: "אנא שמור את הפרויקט לפני הפרסום",
+        variant: "destructive",
+      });
+      return;
+    }
+    setShowPublishDialog(true);
+  };
+
   return (
-    <div className="space-y-4">
-      <Card className="p-4 bg-gray-800 border-gray-700">
-        <div className="flex items-center gap-4 mb-4">
+    <div className="space-y-6">
+      <Card className="p-6 bg-gradient-to-r from-gray-800 to-gray-900 border-gray-700 shadow-xl">
+        <div className="flex items-center gap-4 mb-6">
           <Input
             value={fileName}
             onChange={(e) => handleFileNameChange(e.target.value)}
             placeholder="שם הקובץ..."
-            className="flex-1 bg-gray-700 border-gray-600 text-white"
+            className="flex-1 bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 transition-all"
             disabled={isSampleMode}
           />
-          <Button onClick={handleNewPage} variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700">
-            דף חדש
-          </Button>
-          <Button onClick={handleDuplicate} variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700">
-            <Copy size={16} className="mr-2" />
-            שכפל
-          </Button>
-          <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700" disabled={isSampleMode || isAutoSaving}>
+          <div className="flex gap-3">
+            <Button 
+              onClick={handleNewPage} 
+              variant="outline" 
+              className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white transition-all duration-200 shadow-md"
+            >
+              דף חדש
+            </Button>
+            <Button 
+              onClick={handleDuplicate} 
+              variant="outline" 
+              className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white transition-all duration-200 shadow-md"
+            >
+              <Copy size={16} className="mr-2" />
+              שכפל
+            </Button>
+          </div>
+        </div>
+        
+        <div className="flex gap-3 mb-4">
+          <Button 
+            onClick={handleSave} 
+            className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg transition-all duration-200 transform hover:scale-105" 
+            disabled={isSampleMode || isAutoSaving}
+          >
             <Save size={16} className="mr-2" />
             {isAutoSaving ? "שומר..." : "שמור"}
           </Button>
-          <Button onClick={handleReset} variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700">
+          
+          {lastSavedProject && (
+            <Button 
+              onClick={handlePublish} 
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all duration-200 transform hover:scale-105"
+            >
+              <Share2 size={16} className="mr-2" />
+              פרסום
+            </Button>
+          )}
+          
+          <Button 
+            onClick={handleReset} 
+            variant="outline" 
+            className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white transition-all duration-200 shadow-md"
+          >
             <RotateCcw size={16} className="mr-2" />
             איפוס
           </Button>
@@ -376,8 +492,8 @@ export const HtmlEditor = () => {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[calc(100vh-300px)]">
-        <Card className="p-4 bg-gray-800 border-gray-700">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-350px)]">
+        <Card className="p-4 bg-gray-800 border-gray-700 shadow-xl">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-3 h-3 bg-red-500 rounded-full"></div>
             <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
@@ -388,7 +504,7 @@ export const HtmlEditor = () => {
           <CodeEditor value={htmlCode} onChange={handleCodeChange} />
         </Card>
 
-        <Card className="p-4 bg-gray-800 border-gray-700">
+        <Card className="p-4 bg-gray-800 border-gray-700 shadow-xl">
           <div className="flex items-center gap-2 mb-3">
             <Play size={16} className="text-green-400" />
             <span className="text-sm text-gray-400">תצוגה מקדימה</span>
@@ -396,6 +512,14 @@ export const HtmlEditor = () => {
           <HtmlPreview html={htmlCode} />
         </Card>
       </div>
+
+      {lastSavedProject && (
+        <PublishDialog 
+          open={showPublishDialog} 
+          onOpenChange={setShowPublishDialog}
+          project={lastSavedProject}
+        />
+      )}
     </div>
   );
 };
