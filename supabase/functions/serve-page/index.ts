@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Initialize Supabase client with service role key for unrestricted access
+    // Initialize Supabase client with service role key and bypass auth
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -60,7 +60,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Create client with service role key and bypass RLS
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     // Get the published page by slug using service role to bypass RLS
     console.log('Querying for slug:', slug);

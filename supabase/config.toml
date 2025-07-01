@@ -1,1 +1,5 @@
+
 project_id = "sojhyduhenphvbxvjvpv"
+
+[functions.serve-page]
+verify_jwt = false
