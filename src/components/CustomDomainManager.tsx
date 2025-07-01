@@ -9,7 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 const LOVABLE_API_BASE_URL = "https://lovable-api.com/projects/79412567-53d1-4138-833e-28b721f67338/domains";
-const LOVABLE_API_TOKEN = "eyJhbGciOiJSUzI1NiIsImtpZCI6Ijg3NzQ4NTAwMmYwNWJlMDI2N2VmNDU5ZjViNTEzNTMzYjVjNThjMTIiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoi16DXqNeZ15Qg15DXkdeV15PXqNeU150iLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jS0RCaG1xcWp4S3ByMC1NOVR3OUhxcVFLRzY2QkVFQ3NMa1UxMzVveVdkaTJxUkVvYz1zOTYtYyIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJzb3VyY2Vfc2lnbl9pbl9wcm92aWRlciI6Imdvb2dsZS5jb20iLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vZ3B0LWVuZ2luZWVyLTM5MDYwNyIsImF1ZCI6ImdwdC1lbmdpbmVlci0zOTA2MDciLCJhdXRoX3RpbWUiOjE3NTEyNjYyNDUsInVzZXJfaWQiOiJPZG51NFg1R1h6VkhpemloZTV1clNROWhBTnMxIiwic3ViIjoiT2RudTRYNUdYelZIaXppaGU1dXJTUTloQU5zMSIsImlhdCI6MTc1MTM5NTc0MiwiZXhwIjoxNzUxMzk5MzQyLCJlbWFpbCI6Im9mZmljZUBuZXJpeWFidWRyYWhhbS5jby5pbCIsImZpcmViYXNlIjp7ImlkZW50aXRpZXMiOnsiZ29vZ2xlLmNvbSI6WyIxMDY0NzQzODA1MDU0OTk4MjIzMTYiXSwiZW1haWwiOlsib2ZmaWNlQG5lcml5YWJ1ZHJhaGFtLmNvLmlsIl19LCJzaWduX2luX3Byb3ZpZGVyIjoiY3VzdG9tIn19.nrXDTeQKdBtDIyuhwRpEiIBF4RL_hpGaQ88crMqN2SLYBQw_i4vgu_qBojF7Fqa5Mle0D6HT2f1DXzk-Sj2b8S0sFm0othDUWq3ddk8ELJKH3Ecq1mgKZ7MZuwfA6GhnOjZ8NBnHT-WI0C4IoRbKSg1Wzd3AMVpbeAria8-3i21loHxPKWUS6VT47ep3cCccWJ3JBRq2k-a4ztFYhOotpavSUaEwkykfUe2Z2-AFRyhtWVjMZBKnVwjbo2n8G17nk-g8n3VwjweHUPXe5BK2OCslG0eGQSEEyejAGo2jY5o9EqlEKDzYU17QEkfsz66wQM7ZxPMj7cLz6LcgGSnzWA";
+const LOVABLE_AUTH_TOKEN_URL = "https://lovable-api.com/projects/79412567-53d1-4138-833e-28b721f67338/auth-token";
+const LOVABLE_API_TOKEN = "eyJhbGciOiJSUzI1NiIsImtpZCI6Ijg3NzQ4NTAwMmYwNWJlMDI2N2VmNDU5ZjViNTEzNTMzYjVjNThjMTIiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoi16DXqNeZ15Qg15DXkdeV15PXqNeU150iLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jS0RCaG1xcWp4S3ByMC1NOVR3OUhxcVFLRzY2QkVFQ3NMa1UxMzVveVdkaTJxUkVvYz1zOTYtYyIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJzb3VyY2Vfc2lnbl9pbl9wcm92aWRlciI6Imdvb2dsZS5jb20iLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vZ3B0LWVuZ2luZWVyLTM5MDYwNyIsImF1ZCI6ImdwdC1lbmdpbmVlci0zOTA2MDciLCJhdXRoX3RpbWUiOjE3NTEyNjYyNDUsInVzZXJfaWQiOiJPZG51NFg1R1h6VkhpemloZTV1clNROWhBTnMxIiwic3ViIjoiT2RudTRYNUdYelZIaXppaGU1dXJTUTloQU5zMSIsImlhdCI6MTc1MTM5OTM3MiwiZXhwIjoxNzUxNDAyOTcyLCJlbWFpbCI6Im9mZmljZUBuZXJpeWFidWRyYWhhbS5jby5pbCIsImZpcmViYXNlIjp7ImlkZW50aXRpZXMiOnsiZ29vZ2xlLmNvbSI6WyIxMDY0NzQzODA1MDU0OTk4MjIzMTYiXSwiZW1haWwiOlsib2ZmaWNlQG5lcml5YWJ1ZHJhaGFtLmNvLmlsIl19LCJzaWduX2luX3Byb3ZpZGVyIjoiY3VzdG9tIn19.2VlRA_xujWeYCpLM_agOypp1IuurhX-8FWBAmdjXZDn8rW4c114G-Ghxx5B6TzpE3d5lyTZKXGTYQx6A_hDtF6Q7zwItqAuDfkn8C6Ci1u5HHBROEnt9Yuy39cyuB1Mi_GgNHAgJCMSOTLoDC1nBGTuPW_zU5O2UGjhobqED_zFMCxlMi6Pdm04DCaKtTuvHhmzfq5BG46ZzMoCBe69RuLFuPYmi5nWiWqhSXcjmxaGX2CG2ZwEMiuPXiAq0gYXblRUa5I95InmEHO-ksR9JKJ2GbSeDsUGtZKWMDxKYkpdLtncdpWsd_GeLYQIQWYkGPpdxqEV-5PVFuO5Tvb8p-Q";
 
 export const CustomDomainManager = () => {
   const [subdomain, setSubdomain] = useState("");
@@ -91,14 +92,44 @@ export const CustomDomainManager = () => {
     return '';
   };
 
+  const getAuthToken = async () => {
+    try {
+      console.log('Getting fresh auth token from Lovable API');
+      
+      const response = await fetch(LOVABLE_AUTH_TOKEN_URL, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to get auth token:', response.status, errorText);
+        throw new Error(`Failed to get auth token: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Got fresh auth token:', result);
+      return result.token;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      throw error;
+    }
+  };
+
   const addDomainToLovableAPI = async (domainToAdd: string) => {
     try {
       console.log('Adding domain to Lovable API:', domainToAdd);
       
+      // Get fresh auth token first
+      const authToken = await getAuthToken();
+      
       const response = await fetch(LOVABLE_API_BASE_URL, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${LOVABLE_API_TOKEN}`,
+          'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -125,10 +156,13 @@ export const CustomDomainManager = () => {
     try {
       console.log('Checking domain in Lovable API:', domainToCheck);
       
+      // Get fresh auth token first
+      const authToken = await getAuthToken();
+      
       const response = await fetch(LOVABLE_API_BASE_URL, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${LOVABLE_API_TOKEN}`,
+          'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json'
         }
       });
