@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -114,7 +113,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
   };
 
   const handleRepublish = async () => {
-    if (!isUpdatingExisting || !customSlug.trim()) {
+    if (!isUpdatingExisting || !customSlug.trim() || !user) {
       return;
     }
 
@@ -144,6 +143,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
         .update(publishedPageData)
         .eq('project_id', project.id)
         .eq('slug', slug)
+        .eq('user_id', user.id) // Ensure user can only update their own pages
         .select()
         .single();
 
@@ -199,6 +199,15 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
       return;
     }
 
+    if (!user) {
+      toast({
+        title: "שגיאה",
+        description: "יש להתחבר כדי לפרסם דפים",
+        variant: "destructive"
+      });
+      return;
+    }
+
     // Validate slug format
     const slugRegex = /^[a-zA-Z0-9-]+$/;
     if (!slugRegex.test(customSlug.trim())) {
@@ -245,9 +254,9 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
         title,
         html_content: project.html,
         project_id: project.id,
+        user_id: user.id, // Associate the page with the current user
         // Add custom domain if user has one
         custom_domain: userDomain
-        // Remove user_id field since we want to allow anonymous publishing
       };
 
       console.log('Publishing page data:', publishedPageData);
@@ -257,6 +266,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
         .from('published_pages')
         .select('id')
         .eq('project_id', project.id)
+        .eq('user_id', user.id)
         .maybeSingle();
 
       let result;

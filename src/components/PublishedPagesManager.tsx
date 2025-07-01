@@ -7,6 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ExternalLink, Trash2, Globe, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface PublishedPage {
   id: string;
@@ -22,17 +23,30 @@ export const PublishedPagesManager = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [deletingPageId, setDeletingPageId] = useState<string | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Load pages on component mount
   useEffect(() => {
-    loadPublishedPages();
-  }, []);
+    if (user) {
+      loadPublishedPages();
+    } else {
+      setIsLoading(false);
+    }
+  }, [user]);
 
   const loadPublishedPages = async () => {
+    if (!user) {
+      setPublishedPages([]);
+      setIsLoading(false);
+      return;
+    }
+
     try {
+      // Only fetch pages that belong to the current user
       const { data, error } = await supabase
         .from('published_pages')
         .select('id, slug, title, project_id, created_at, updated_at')
+        .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
 
       if (error) {
@@ -134,6 +148,18 @@ export const PublishedPagesManager = () => {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         <span className="mr-3 text-slate-400">טוען דפים מפורסמים...</span>
       </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Card className="p-8 bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800 border-slate-700 text-center shadow-xl">
+        <Globe className="mx-auto mb-4 text-slate-400" size={48} />
+        <h3 className="text-xl font-bold text-white mb-2">נדרש אימות</h3>
+        <p className="text-slate-400">
+          יש להתחבר כדי לצפות בדפים המפורסמים שלך
+        </p>
+      </Card>
     );
   }
 

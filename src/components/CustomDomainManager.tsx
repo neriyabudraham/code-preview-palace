@@ -59,12 +59,12 @@ export const CustomDomainManager = () => {
       return;
     }
 
-    // Basic domain validation
-    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.[a-zA-Z]{2,}$/;
+    // Improved domain validation that supports subdomains
+    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
     if (!domainRegex.test(customDomain.trim())) {
       toast({
         title: "שגיאה",
-        description: "פורמט הדומיין לא תקין",
+        description: "פורמט הדומיין לא תקין. דוגמה: example.com או subdomain.example.com",
         variant: "destructive"
       });
       return;
@@ -160,7 +160,7 @@ export const CustomDomainManager = () => {
               <Input
                 value={customDomain}
                 onChange={(e) => setCustomDomain(e.target.value)}
-                placeholder="example.com או subdomain.example.com"
+                placeholder="example.com או page.example.com"
                 className="bg-slate-700 border-slate-600 text-white"
                 dir="ltr"
               />

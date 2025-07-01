@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,11 +42,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string) => {
-    // Use the correct redirect URL based on environment
-    const isLocalhost = window.location.hostname === 'localhost';
-    const redirectUrl = isLocalhost 
-      ? `${window.location.origin}/`
-      : `${window.location.origin}/`;
+    // Use the correct redirect URL - your actual app URL
+    const redirectUrl = `https://code-preview-palace.lovable.app/`;
     
     console.log('Sign up redirect URL:', redirectUrl);
     
