@@ -14,6 +14,7 @@ import { useUserProjects } from "@/hooks/useUserProjects";
 import { UserProject } from "@/services/userProjectsService";
 
 const EMPTY_HTML = "";
+const LOCAL_STORAGE_KEY = "htmlEditor";
 
 export const HtmlEditor = () => {
   const [htmlCode, setHtmlCode] = useState("");
@@ -25,13 +26,64 @@ export const HtmlEditor = () => {
   const [isProjectPublished, setIsProjectPublished] = useState(false);
   const [currentDraft, setCurrentDraft] = useState<UserProject | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastLocalSave, setLastLocalSave] = useState<Date | null>(null);
   
   const { toast } = useToast();
   const { user } = useAuth();
   const { projects, saveProject, saveDraft, isSaving } = useUserProjects();
   
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const localSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef<string>("");
+
+  // Save to local storage
+  const saveToLocalStorage = useCallback(() => {
+    const dataToSave = {
+      htmlCode,
+      fileName,
+      currentProjectId,
+      isEditingExisting,
+      lastSaved: new Date().toISOString(),
+      userId: user?.id
+    };
+    
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
+      setLastLocalSave(new Date());
+      console.log("Saved to local storage:", dataToSave);
+    } catch (error) {
+      console.error("Error saving to local storage:", error);
+    }
+  }, [htmlCode, fileName, currentProjectId, isEditingExisting, user?.id]);
+
+  // Load from local storage
+  const loadFromLocalStorage = useCallback(() => {
+    try {
+      const savedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (savedData) {
+        const parsed = JSON.parse(savedData);
+        
+        // Only load if it belongs to the current user (or if no user was saved)
+        if (!parsed.userId || !user?.id || parsed.userId === user.id) {
+          return parsed;
+        }
+      }
+    } catch (error) {
+      console.error("Error loading from local storage:", error);
+    }
+    return null;
+  }, [user?.id]);
+
+  // Clear local storage
+  const clearLocalStorage = useCallback(() => {
+    try {
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      setLastLocalSave(null);
+      console.log("Cleared local storage");
+    } catch (error) {
+      console.error("Error clearing local storage:", error);
+    }
+  }, []);
 
   // Generate default filename with automatic numbering
   const generateDefaultFileName = useCallback(() => {
@@ -54,10 +106,10 @@ export const HtmlEditor = () => {
     return project && project.is_published;
   }, [projects]);
 
-  // Auto-save function
+  // Auto-save to database function
   const autoSave = useCallback(async () => {
     if (!user || !fileName.trim()) {
-      console.log('No user logged in or no filename, skipping auto-save');
+      console.log('No user logged in or no filename, skipping database auto-save');
       return;
     }
 
@@ -105,21 +157,34 @@ export const HtmlEditor = () => {
         // Clear draft if it exists
         setCurrentDraft(null);
         
-        console.log("Auto-saved successfully");
+        // Clear local storage since we saved to database
+        clearLocalStorage();
+        
+        console.log("Auto-saved to database successfully");
       }
     } catch (error) {
-      console.error("Auto-save failed:", error);
+      console.error("Database auto-save failed:", error);
     }
-  }, [htmlCode, fileName, currentProjectId, user, saveProject, generateDefaultFileName, projects, toast]);
+  }, [htmlCode, fileName, currentProjectId, user, saveProject, generateDefaultFileName, projects, toast, clearLocalStorage]);
 
-  // Track changes to mark unsaved changes
+  // Track changes to mark unsaved changes and trigger local storage save
   useEffect(() => {
-    if (htmlCode !== lastSavedContentRef.current) {
+    if (htmlCode !== lastSavedContentRef.current || fileName !== (lastSavedProject?.name || "")) {
       setHasUnsavedChanges(true);
+      
+      // Clear existing timeout
+      if (localSaveTimeoutRef.current) {
+        clearTimeout(localSaveTimeoutRef.current);
+      }
+      
+      // Set new timeout for local storage save (immediate for local, 500ms delay)
+      localSaveTimeoutRef.current = setTimeout(() => {
+        saveToLocalStorage();
+      }, 500);
     }
-  }, [htmlCode, fileName]);
+  }, [htmlCode, fileName, lastSavedProject, saveToLocalStorage]);
 
-  // Set up auto-save when content changes
+  // Set up auto-save to database when content changes
   useEffect(() => {
     if (!fileName.trim() || !user) return;
 
@@ -128,7 +193,7 @@ export const HtmlEditor = () => {
       clearTimeout(autoSaveTimeoutRef.current);
     }
 
-    // Set new timeout for auto-save (2 seconds after user stops typing)
+    // Set new timeout for database auto-save (2 seconds after user stops typing)
     autoSaveTimeoutRef.current = setTimeout(() => {
       autoSave();
     }, 2000);
@@ -141,6 +206,7 @@ export const HtmlEditor = () => {
     };
   }, [htmlCode, fileName, autoSave, user]);
 
+  // Load data on component mount
   useEffect(() => {
     // Check if there's an editing project in sessionStorage (from project manager)
     const editingProject = sessionStorage.getItem("editingProject");
@@ -159,6 +225,8 @@ export const HtmlEditor = () => {
           setHasUnsavedChanges(false);
           // Clear the sessionStorage after loading
           sessionStorage.removeItem("editingProject");
+          // Clear local storage since we're editing an existing project
+          clearLocalStorage();
           
           toast({
             title: "פרויקט נטען",
@@ -171,6 +239,23 @@ export const HtmlEditor = () => {
       }
     }
 
+    // If no editing project, try to load from local storage
+    const localData = loadFromLocalStorage();
+    if (localData && (localData.htmlCode || localData.fileName)) {
+      setHtmlCode(localData.htmlCode || "");
+      setFileName(localData.fileName || "");
+      setCurrentProjectId(localData.currentProjectId);
+      setIsEditingExisting(localData.isEditingExisting || false);
+      lastSavedContentRef.current = ""; // Mark as unsaved since it's from local storage
+      setHasUnsavedChanges(true);
+      
+      toast({
+        title: "נתונים שוחזרו",
+        description: "העבודה השמורה במקומי שוחזרה",
+      });
+      return;
+    }
+
     // Check if there's a draft to restore
     const drafts = projects.filter((p: UserProject) => p.is_draft);
     if (drafts.length > 0) {
@@ -178,7 +263,7 @@ export const HtmlEditor = () => {
     }
 
     // Show empty editor when entering fresh
-    if (!editingProject) {
+    if (!editingProject && !localData) {
       setHtmlCode(EMPTY_HTML);
       setFileName("");
       setCurrentProjectId(null);
@@ -188,7 +273,47 @@ export const HtmlEditor = () => {
       lastSavedContentRef.current = "";
       setHasUnsavedChanges(false);
     }
-  }, [toast, checkIfProjectIsPublished, user, projects]);
+  }, [toast, checkIfProjectIsPublished, user, projects, loadFromLocalStorage, clearLocalStorage]);
+
+  // Save current work as draft when navigating away
+  useEffect(() => {
+    const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
+      // Save to local storage immediately
+      saveToLocalStorage();
+      
+      // Save as draft if there are unsaved changes and user is logged in
+      if (hasUnsavedChanges && user && (htmlCode.trim() || fileName.trim())) {
+        const draftId = currentProjectId || `draft_${Date.now()}`;
+        const draftName = fileName || 'טיוטה - שמירה אוטומטית';
+        
+        // Try to save as draft (non-blocking)
+        saveDraft(draftId, draftName, htmlCode).catch(console.error);
+        
+        // Show browser warning
+        event.preventDefault();
+        event.returnValue = 'יש לך שינויים לא שמורים. האם אתה בטוח שברצונך לעזוב?';
+        return event.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges, user, htmlCode, fileName, currentProjectId, saveToLocalStorage, saveDraft]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+      if (localSaveTimeoutRef.current) {
+        clearTimeout(localSaveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleCodeChange = (newCode: string) => {
     setHtmlCode(newCode);
@@ -212,6 +337,8 @@ export const HtmlEditor = () => {
       });
     }
     
+    // Clear local storage and reset state
+    clearLocalStorage();
     setHtmlCode(EMPTY_HTML);
     setFileName("");
     setCurrentProjectId(null);
@@ -235,6 +362,9 @@ export const HtmlEditor = () => {
       setIsEditingExisting(true);
       setHasUnsavedChanges(true);
       
+      // Clear local storage since we're loading from draft
+      clearLocalStorage();
+      
       toast({
         title: "טיוטה שוחזרה",
         description: "הטיוטה נטענה בהצלחה",
@@ -244,7 +374,6 @@ export const HtmlEditor = () => {
 
   const handleClearDraft = async () => {
     if (currentDraft) {
-      // Here you could delete the draft from the database if needed
       setCurrentDraft(null);
       toast({
         title: "טיוטה נמחקה",
@@ -302,6 +431,9 @@ export const HtmlEditor = () => {
     lastSavedContentRef.current = "";
     setHasUnsavedChanges(true);
     
+    // Clear local storage since we're creating a new project
+    clearLocalStorage();
+    
     toast({
       title: "שוכפל בהצלחה",
       description: "נוצר עותק של הדף הנוכחי",
@@ -309,6 +441,7 @@ export const HtmlEditor = () => {
   };
 
   const handleReset = () => {
+    clearLocalStorage();
     setHtmlCode(EMPTY_HTML);
     setFileName("");
     setCurrentProjectId(null);
@@ -470,7 +603,7 @@ export const HtmlEditor = () => {
             <div className="bg-emerald-900/40 border border-emerald-700/50 rounded-xl p-4 text-emerald-200 text-sm flex-1 backdrop-blur-sm">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                🔄 שמירה אוטומטית פעילה - השינויים נשמרים אוטומטיים במאגר
+                💾 שמירה אוטומטית פעילה - נשמר במקומי + במאגר
                 {isProjectPublished && (
                   <Badge variant="outline" className="mr-2 border-orange-400 text-orange-400">
                     מפורסם
@@ -480,6 +613,11 @@ export const HtmlEditor = () => {
                   <Badge variant="outline" className="mr-2 border-yellow-400 text-yellow-400">
                     יש שינויים לא שמורים
                   </Badge>
+                )}
+                {lastLocalSave && (
+                  <span className="text-xs text-emerald-300">
+                    (שמירה מקומית: {lastLocalSave.toLocaleTimeString('he-IL')})
+                  </span>
                 )}
               </div>
             </div>
