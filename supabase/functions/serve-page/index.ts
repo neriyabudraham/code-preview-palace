@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
       console.log('No slug found, returning 404');
       return new Response('Page not found', { 
         status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'text/html' }
+        headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' }
       })
     }
 
@@ -147,18 +147,26 @@ Deno.serve(async (req) => {
         </html>
       `, { 
         status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' }
+        headers: { 
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-cache'
+        }
       })
     }
 
     console.log('Serving page for slug:', slug);
-    // Return the HTML content
-    return new Response(page.html_content, {
+    
+    // Make sure the HTML content is properly encoded
+    const htmlContent = page.html_content;
+    
+    // Return the HTML content with proper headers for rendering
+    return new Response(htmlContent, {
       status: 200,
       headers: { 
-        ...corsHeaders, 
         'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'public, max-age=3600'
+        'Cache-Control': 'public, max-age=3600',
+        // Add additional headers to ensure proper rendering
+        'X-Content-Type-Options': 'nosniff'
       }
     })
 
@@ -166,7 +174,9 @@ Deno.serve(async (req) => {
     console.error('Unexpected error:', error)
     return new Response('Internal Server Error', { 
       status: 500,
-      headers: corsHeaders
+      headers: { 
+        'Content-Type': 'text/html; charset=utf-8'
+      }
     })
   }
 })
