@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,14 +15,18 @@ export const CustomDomainManager = () => {
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isDomainVerified, setIsDomainVerified] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
 
   // Load current domain configuration
   useEffect(() => {
     const loadDomainConfig = async () => {
-      if (!user) return;
+      if (!user || !session) {
+        console.log('No user or session available for loading domain config');
+        return;
+      }
 
       try {
+        console.log('Loading domain config for user:', user.id);
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('custom_domain, domain_verified')
@@ -32,6 +35,11 @@ export const CustomDomainManager = () => {
 
         if (error) {
           console.error('Error loading profile:', error);
+          toast({
+            title: "שגיאה",
+            description: "לא ניתן לטעון את הגדרות הדומיין",
+            variant: "destructive"
+          });
           return;
         }
 
@@ -39,17 +47,30 @@ export const CustomDomainManager = () => {
           setCurrentDomain(profile.custom_domain);
           setIsDomainVerified(profile.domain_verified || false);
           setCustomDomain(profile.custom_domain || "");
+          console.log('Loaded domain config:', profile);
         }
       } catch (error) {
         console.error('Error in loadDomainConfig:', error);
+        toast({
+          title: "שגיאה",
+          description: "אירעה שגיאה בטעינת הגדרות הדומיין",
+          variant: "destructive"
+        });
       }
     };
 
     loadDomainConfig();
-  }, [user]);
+  }, [user, session, toast]);
 
   const handleSaveDomain = async () => {
-    if (!user) return;
+    if (!user || !session) {
+      toast({
+        title: "שגיאה",
+        description: "יש להתחבר כדי לשמור דומיין",
+        variant: "destructive"
+      });
+      return;
+    }
 
     if (!customDomain.trim()) {
       toast({
@@ -74,6 +95,8 @@ export const CustomDomainManager = () => {
     setIsLoading(true);
 
     try {
+      console.log('Saving domain for user:', user.id, 'Domain:', customDomain.trim());
+      
       const { error } = await supabase
         .from('profiles')
         .upsert({
@@ -84,6 +107,7 @@ export const CustomDomainManager = () => {
         });
 
       if (error) {
+        console.error('Supabase error saving domain:', error);
         throw error;
       }
 
@@ -94,11 +118,20 @@ export const CustomDomainManager = () => {
         title: "נשמר בהצלחה!",
         description: "הדומיין המותאם אישית נשמר. יש להגדיר את רשומת ה-DNS כדי להשלים את ההגדרה",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving domain:', error);
+      
+      let errorMessage = "אירעה שגיאה בשמירת הדומיין";
+      
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.code) {
+        errorMessage = `שגיאה: ${error.code}`;
+      }
+
       toast({
         title: "שגיאה",
-        description: "אירעה שגיאה בשמירת הדומיין",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -107,11 +140,20 @@ export const CustomDomainManager = () => {
   };
 
   const handleDisconnectDomain = async () => {
-    if (!user) return;
+    if (!user || !session) {
+      toast({
+        title: "שגיאה",
+        description: "יש להתחבר כדי לנתק דומיין",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setIsDisconnecting(true);
 
     try {
+      console.log('Disconnecting domain for user:', user.id);
+      
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -121,6 +163,7 @@ export const CustomDomainManager = () => {
         .eq('id', user.id);
 
       if (error) {
+        console.error('Error disconnecting domain:', error);
         throw error;
       }
 
@@ -132,11 +175,18 @@ export const CustomDomainManager = () => {
         title: "דומיין נותק בהצלחה",
         description: "הדומיין המותאם אישית הוסר. הדפים יפורסמו תחת הדומיין הברירת מחדל",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error disconnecting domain:', error);
+      
+      let errorMessage = "אירעה שגיאה בניתוק הדומיין";
+      
+      if (error?.message) {
+        errorMessage = error.message;
+      }
+
       toast({
         title: "שגיאה",
-        description: "אירעה שגיאה בניתוק הדומיין",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -151,6 +201,19 @@ export const CustomDomainManager = () => {
       description: "כתובת ה-IP הועתקה ללוח",
     });
   };
+
+  // Show loading state if no session yet
+  if (!session) {
+    return (
+      <div className="space-y-6">
+        <Card className="bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800 border-slate-700 p-6">
+          <div className="flex items-center justify-center h-32">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
