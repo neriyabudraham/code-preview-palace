@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,7 +41,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string) => {
-    const redirectUrl = `${window.location.origin}/`;
+    // Use the correct redirect URL based on environment
+    const isLocalhost = window.location.hostname === 'localhost';
+    const redirectUrl = isLocalhost 
+      ? `${window.location.origin}/`
+      : `${window.location.origin}/`;
+    
+    console.log('Sign up redirect URL:', redirectUrl);
     
     const { error } = await supabase.auth.signUp({
       email,
