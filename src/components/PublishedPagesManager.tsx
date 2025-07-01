@@ -20,6 +20,7 @@ interface PublishedPage {
 export const PublishedPagesManager = () => {
   const [publishedPages, setPublishedPages] = useState<PublishedPage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingPageId, setDeletingPageId] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Load pages on component mount
@@ -51,42 +52,69 @@ export const PublishedPagesManager = () => {
     }
   };
 
-  const deletePage = async (id: string, slug: string) => {
+  const deletePage = async (id: string, slug: string, title: string) => {
+    setDeletingPageId(id);
+    
     try {
+      console.log(`Deleting page: ${title} (${slug}) with ID: ${id}`);
+      
+      // Delete from Supabase
       const { error } = await supabase
         .from('published_pages')
         .delete()
         .eq('id', id);
 
       if (error) {
+        console.error('Supabase deletion error:', error);
         throw error;
       }
 
-      // Update local state
-      setPublishedPages(prev => prev.filter(page => page.id !== id));
-      
-      // Update localStorage projects
-      const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
-      const updatedProjects = savedProjects.map((project: any) => {
-        if (project.customSlug === slug) {
-          const { publishedUrl, customSlug, publishedAt, ...rest } = project;
-          return rest;
-        }
-        return project;
+      console.log('Page deleted from Supabase successfully');
+
+      // Update local state immediately
+      setPublishedPages(prev => {
+        const updated = prev.filter(page => page.id !== id);
+        console.log(`Updated published pages list. Removed ${title}, remaining: ${updated.length} pages`);
+        return updated;
       });
-      localStorage.setItem("htmlProjects", JSON.stringify(updatedProjects));
+      
+      // Update localStorage projects - remove publication data
+      try {
+        const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
+        console.log('Current localStorage projects:', savedProjects);
+        
+        const updatedProjects = savedProjects.map((project: any) => {
+          // Check if this project matches the deleted page
+          if (project.customSlug === slug || project.publishedUrl?.includes(slug)) {
+            console.log(`Removing publication data from project: ${project.name || project.id}`);
+            // Remove publication-related fields
+            const { publishedUrl, customSlug, publishedAt, ...cleanProject } = project;
+            return cleanProject;
+          }
+          return project;
+        });
+        
+        localStorage.setItem("htmlProjects", JSON.stringify(updatedProjects));
+        console.log('Updated localStorage projects:', updatedProjects);
+      } catch (localStorageError) {
+        console.error('Error updating localStorage:', localStorageError);
+        // Don't fail the operation if localStorage update fails
+      }
 
       toast({
         title: "נמחק בהצלחה",
-        description: `הדף "${slug}" הוסר מהפרסום`,
+        description: `הדף "${title}" הוסר מהפרסום. כעת ניתן להשתמש בסלאג "${slug}" שוב`,
       });
+
     } catch (error) {
       console.error('Error deleting page:', error);
       toast({
         title: "שגיאה",
-        description: "לא ניתן למחוק את הדף",
+        description: "לא ניתן למחוק את הדף. נסה שוב מאוחר יותר",
         variant: "destructive"
       });
+    } finally {
+      setDeletingPageId(null);
     }
   };
 
@@ -167,8 +195,17 @@ export const PublishedPagesManager = () => {
                 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button size="sm" variant="destructive" className="px-3">
-                      <Trash2 size={14} />
+                    <Button 
+                      size="sm" 
+                      variant="destructive" 
+                      className="px-3"
+                      disabled={deletingPageId === page.id}
+                    >
+                      {deletingPageId === page.id ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      ) : (
+                        <Trash2 size={14} />
+                      )}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent className="bg-slate-800 border-slate-700">
@@ -176,7 +213,7 @@ export const PublishedPagesManager = () => {
                       <AlertDialogTitle className="text-white">מחיקת דף מפורסם</AlertDialogTitle>
                       <AlertDialogDescription className="text-slate-400">
                         האם אתה בטוח שברצונך למחוק את הדף "{page.title}" מהפרסום? 
-                        הדף לא יהיה זמין יותר בכתובת /{page.slug}.
+                        הדף לא יהיה זמין יותר בכתובת /{page.slug} ותוכל להשתמש בסלאג הזה שוב בעתיד.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -184,10 +221,11 @@ export const PublishedPagesManager = () => {
                         ביטול
                       </AlertDialogCancel>
                       <AlertDialogAction
-                        onClick={() => deletePage(page.id, page.slug)}
+                        onClick={() => deletePage(page.id, page.slug, page.title)}
                         className="bg-red-600 hover:bg-red-700"
+                        disabled={deletingPageId === page.id}
                       >
-                        מחק
+                        {deletingPageId === page.id ? "מוחק..." : "מחק"}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
