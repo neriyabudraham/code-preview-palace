@@ -3,25 +3,66 @@ import { useState } from "react";
 import { HtmlEditor } from "@/components/HtmlEditor";
 import { ProjectManager } from "@/components/ProjectManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Code, FolderOpen } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Code, FolderOpen, LogOut, User } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("editor");
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
 
   const handleEditProject = () => {
     setActiveTab("editor");
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "התנתקת בהצלחה",
+        description: "להתראות!",
+      });
+    } catch (error) {
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בהתנתקות",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-            HTML Editor Pro
-          </h1>
-          <p className="text-gray-400 text-sm mt-1">
-            עורך HTML עם תצוגה מקדימה בזמן אמת
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                HTML Editor Pro
+              </h1>
+              <p className="text-gray-400 text-sm mt-1">
+                עורך HTML עם תצוגה מקדימה בזמן אמת
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-sm text-gray-400">
+                <User className="w-4 h-4" />
+                <span>{user?.email}</span>
+              </div>
+              <Button
+                onClick={handleSignOut}
+                variant="outline"
+                size="sm"
+                className="border-gray-600 text-gray-300 hover:bg-gray-700"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                התנתק
+              </Button>
+            </div>
+          </div>
         </div>
       </header>
       
