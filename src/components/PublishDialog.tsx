@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -24,7 +23,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Load user's custom domain
+  // Load user's custom domain - removed verification requirement
   useEffect(() => {
     const loadUserDomain = async () => {
       if (!user) return;
@@ -32,7 +31,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
       try {
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('custom_domain, domain_verified')
+          .select('custom_domain')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -41,7 +40,8 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
           return;
         }
 
-        if (profile && profile.custom_domain && profile.domain_verified) {
+        // Use custom domain if exists, no verification check needed
+        if (profile && profile.custom_domain) {
           setUserDomain(profile.custom_domain);
         }
       } catch (error) {
@@ -126,7 +126,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
         title,
         html_content: project.html,
         updated_at: new Date().toISOString(),
-        // Add custom domain if user has one
+        // Add custom domain without verification requirement
         custom_domain: userDomain
       };
 
@@ -149,12 +149,13 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
         throw result.error;
       }
       
-      // Update project in localStorage
-      const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
+      // Update project in localStorage with user-specific key
+      const userProjectsKey = `htmlProjects_${user.id}`;
+      const savedProjects = JSON.parse(localStorage.getItem(userProjectsKey) || "[]");
       const projectIndex = savedProjects.findIndex((p: any) => p.id === project.id);
       if (projectIndex !== -1) {
         savedProjects[projectIndex].publishedAt = new Date().toISOString();
-        localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
+        localStorage.setItem(userProjectsKey, JSON.stringify(savedProjects));
       }
       
       toast({
@@ -243,7 +244,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
         html_content: project.html,
         project_id: project.id,
         user_id: user.id,
-        // Add custom domain if user has one
+        // Add custom domain without verification requirement
         custom_domain: userDomain
       };
 
@@ -288,14 +289,15 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
         : `https://html-to-site.lovable.app/${slug}`;
       setPublishedUrl(url);
       
-      // Update project in localStorage
-      const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
+      // Update project in localStorage with user-specific key
+      const userProjectsKey = `htmlProjects_${user.id}`;
+      const savedProjects = JSON.parse(localStorage.getItem(userProjectsKey) || "[]");
       const projectIndex = savedProjects.findIndex((p: any) => p.id === project.id);
       if (projectIndex !== -1) {
         savedProjects[projectIndex].publishedUrl = url;
         savedProjects[projectIndex].customSlug = slug;
         savedProjects[projectIndex].publishedAt = new Date().toISOString();
-        localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
+        localStorage.setItem(userProjectsKey, JSON.stringify(savedProjects));
       }
       
       const actionText = isUpdatingExisting ? "עודכן" : "פורסם";
@@ -514,7 +516,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
                 </Button>
               </div>
 
-              {/* Republish Button - New Feature */}
+              {/* Republish Button */}
               <Button 
                 onClick={handleRepublish}
                 disabled={isRepublishing}
