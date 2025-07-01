@@ -133,19 +133,21 @@ export const CustomDomainManager = () => {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Origin': 'https://lovable.dev',
+          'Referer': 'https://lovable.dev/'
         },
         body: JSON.stringify({
           domain: domainToAdd
         })
       });
-
+  
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Failed to add domain to Lovable API:', response.status, errorText);
         throw new Error(`Failed to add domain: ${response.status}`);
       }
-
+  
       const result = await response.json();
       console.log('Domain added to Lovable API successfully:', result);
       return result;
@@ -154,7 +156,7 @@ export const CustomDomainManager = () => {
       throw error;
     }
   };
-
+  
   const checkDomainInLovableAPI = async (domainToCheck: string) => {
     try {
       console.log('Checking domain in Lovable API:', domainToCheck);
@@ -166,19 +168,21 @@ export const CustomDomainManager = () => {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Origin': 'https://lovable.dev',
+          'Referer': 'https://lovable.dev/'
         }
       });
-
+  
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Failed to check domains in Lovable API:', response.status, errorText);
         throw new Error(`Failed to check domains: ${response.status}`);
       }
-
+  
       const domains = await response.json();
       console.log('Domains from Lovable API:', domains);
-
+  
       // Check if the domain exists and is active
       const domainEntry = domains.find((d: any) => d.domain === domainToCheck);
       if (domainEntry && domainEntry.status === 'active') {
