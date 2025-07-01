@@ -30,19 +30,16 @@ export const PublishedPageViewer = () => {
         
         console.log('Current host:', currentHost, 'Is custom domain:', isCustomDomain);
         
+        // With the new schema, we can query directly using the generated slug_id
+        // The slug_id will be automatically generated as domain/slug
+        const expectedSlugId = `${currentHost}/${slug}`;
+        
+        console.log('Looking for slug_id:', expectedSlugId);
+        
         let query = supabase
           .from('published_pages')
-          .select('html_content, title, custom_domain')
-          .eq('slug', slug);
-        
-        // If accessing via custom domain, filter by that domain
-        // If accessing via default domains, get pages without custom domain OR with matching custom domain
-        if (isCustomDomain) {
-          query = query.eq('custom_domain', currentHost);
-        } else {
-          // For default domains, get pages that either have no custom domain or match the current host
-          query = query.or(`custom_domain.is.null,custom_domain.eq.${currentHost}`);
-        }
+          .select('html_content, title, custom_domain, slug_id')
+          .eq('slug_id', expectedSlugId);
         
         const { data: page, error: dbError } = await query.maybeSingle();
 
@@ -54,13 +51,41 @@ export const PublishedPageViewer = () => {
         }
 
         if (!page) {
-          console.log('Page not found for slug:', slug, 'and domain:', currentHost);
+          console.log('Page not found for slug_id:', expectedSlugId);
+          // If not found with exact slug_id, try fallback for default domain pages accessed via custom domain
+          if (isCustomDomain) {
+            console.log('Trying fallback for default domain...');
+            const fallbackSlugId = `html-to-site.lovable.app/${slug}`;
+            const { data: fallbackPage, error: fallbackError } = await supabase
+              .from('published_pages')
+              .select('html_content, title, custom_domain, slug_id')
+              .eq('slug_id', fallbackSlugId)
+              .maybeSingle();
+            
+            if (fallbackError) {
+              console.error('Fallback query error:', fallbackError);
+              setError("הדף לא נמצא");
+              setLoading(false);
+              return;
+            }
+            
+            if (fallbackPage) {
+              console.log('Found page with fallback slug_id:', fallbackSlugId);
+              setHtmlContent(fallbackPage.html_content);
+              setLoading(false);
+              if (fallbackPage.title) {
+                document.title = fallbackPage.title;
+              }
+              return;
+            }
+          }
+          
           setError("הדף לא נמצא");
           setLoading(false);
           return;
         }
 
-        console.log('Page loaded successfully:', page.title, 'Domain:', page.custom_domain);
+        console.log('Page loaded successfully:', page.title, 'Slug ID:', page.slug_id);
         
         // Ensure proper HTML structure
         let htmlContent = page.html_content;

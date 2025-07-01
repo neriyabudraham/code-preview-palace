@@ -76,19 +76,22 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
 
   const checkSlugAvailability = async (slug: string) => {
     try {
-      // Check if the slug is available for the current user
+      // With the new schema, we need to check if the slug_id combination is available
+      // The slug_id is automatically generated as domain/slug
+      const expectedDomain = userDomain || 'html-to-site.lovable.app';
+      const expectedSlugId = `${expectedDomain}/${slug}`;
+      
       const { data: existingPages, error } = await supabase
         .from('published_pages')
-        .select('id, project_id, user_id')
-        .eq('slug', slug)
-        .eq('user_id', user?.id);
+        .select('id, project_id, user_id, slug_id')
+        .eq('slug_id', expectedSlugId);
 
       if (error) {
         console.error('Error checking slug availability:', error);
         return { available: false, error: 'שגיאה בבדיקת זמינות הסיומת' };
       }
 
-      // If no pages found for this user with this slug, it's available
+      // If no pages found with this slug_id, it's available
       if (!existingPages || existingPages.length === 0) {
         return { available: true };
       }
@@ -97,7 +100,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
       const conflictingPages = existingPages.filter(page => page.project_id !== project.id);
       
       if (conflictingPages.length > 0) {
-        return { available: false, error: 'הסיומת כבר בשימוש על ידי פרויקט אחר שלך' };
+        return { available: false, error: `הסיומת כבר בשימוש בדומיין ${expectedDomain}` };
       }
 
       return { available: true };
@@ -221,7 +224,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
       const slug = customSlug.trim();
       console.log('Publishing with slug:', slug);
       
-      // Check slug availability
+      // Check slug availability with new schema
       const { available, error: availabilityError } = await checkSlugAvailability(slug);
       
       if (!available) {
@@ -317,8 +320,8 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
         const errorMsg = (error as any).message;
         if (errorMsg.includes('row-level security policy')) {
           errorMessage = "שגיאת הרשאות. אנא פנה למנהל המערכת.";
-        } else if (errorMsg.includes('duplicate key')) {
-          errorMessage = "הסיומת כבר קיימת. אנא בחר סיומת אחרת.";
+        } else if (errorMsg.includes('duplicate key') || errorMsg.includes('unique constraint')) {
+          errorMessage = "הסיומת כבר קיימת בדומיין זה. אנא בחר סיומת אחרת.";
         }
       }
       
@@ -441,6 +444,9 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
                       הסיומת הנוכחית: {project.customSlug || "לא מוגדרת"}
                     </p>
                   )}
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                    ✨ כעת ניתן להשתמש באותה סיומת בדומיינים שונים!
+                  </p>
                 </div>
                 
                 <Button 
