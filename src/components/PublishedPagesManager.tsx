@@ -202,7 +202,7 @@ export const PublishedPagesManager = () => {
                       <AlertDialogTitle className="text-white">מחיקת דף מפורסם</AlertDialogTitle>
                       <AlertDialogDescription className="text-slate-400">
                         האם אתה בטוח שברצונך למחוק את הדף "{page.title}" מהפרסום? 
-                        הדף לא יהיה זמין יותר בכתובת page.neriyabudraham.co.il/{page.slag}.
+                        הדף לא יהיה זמין יותר בכתובת page.neriyabudraham.co.il/{page.slug}.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
