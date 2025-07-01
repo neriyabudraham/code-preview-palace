@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -672,9 +671,11 @@ export const HtmlEditor = () => {
 
       {lastSavedProject && (
         <PublishDialog 
-          open={showPublishDialog} 
-          onOpenChange={setShowPublishDialog}
-          project={lastSavedProject}
+          isOpen={showPublishDialog} 
+          onClose={() => setShowPublishDialog(false)}
+          htmlContent={lastSavedProject.html}
+          projectId={lastSavedProject.id}
+          title={lastSavedProject.name}
         />
       )}
     </div>
