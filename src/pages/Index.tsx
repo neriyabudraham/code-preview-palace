@@ -6,6 +6,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Code, FolderOpen } from "lucide-react";
 
 const Index = () => {
+  const [activeTab, setActiveTab] = useState("editor");
+
+  const handleEditProject = () => {
+    setActiveTab("editor");
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm">
@@ -20,7 +26,7 @@ const Index = () => {
       </header>
       
       <div className="container mx-auto px-4 py-6">
-        <Tabs defaultValue="editor" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 bg-gray-800 border-gray-700">
             <TabsTrigger value="editor" className="flex items-center gap-2">
               <Code size={16} />
@@ -37,7 +43,7 @@ const Index = () => {
           </TabsContent>
           
           <TabsContent value="projects" className="mt-6">
-            <ProjectManager />
+            <ProjectManager onEditProject={handleEditProject} />
           </TabsContent>
         </Tabs>
       </div>

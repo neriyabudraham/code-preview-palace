@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { HtmlPreview } from "./HtmlPreview";
 import { Edit, Trash2, Eye, Download, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -16,7 +17,11 @@ interface Project {
   updatedAt: string;
 }
 
-export const ProjectManager = () => {
+interface ProjectManagerProps {
+  onEditProject: () => void;
+}
+
+export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
@@ -47,10 +52,11 @@ export const ProjectManager = () => {
   const editProject = (project: Project) => {
     // Store the project to edit in sessionStorage so the editor can pick it up
     sessionStorage.setItem("editingProject", JSON.stringify(project));
-    // Switch to editor tab (this would need to be handled by parent component)
+    // Call the callback to switch tabs
+    onEditProject();
     toast({
-      title: "מעבר לעריכה",
-      description: "עבור לטאב העריכה כדי לערוך את הפרויקט",
+      title: "עבר לעריכה",
+      description: `הפרויקט "${project.name}" נטען לעריכה`,
     });
   };
 
@@ -120,13 +126,17 @@ export const ProjectManager = () => {
           </p>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => {
             const { title, preview } = getPreviewText(project.html);
             
             return (
-              <Card key={project.id} className="p-4 bg-gray-800 border-gray-700 hover:bg-gray-750 transition-colors">
-                <div className="space-y-3">
+              <Card key={project.id} className="bg-gray-800 border-gray-700 hover:bg-gray-750 transition-colors overflow-hidden">
+                <div className="aspect-video bg-white border-b border-gray-700">
+                  <HtmlPreview html={project.html} />
+                </div>
+                
+                <div className="p-4 space-y-3">
                   <div>
                     <h3 className="font-semibold text-white text-lg mb-1">{project.name}</h3>
                     {title && title !== project.name && (
@@ -134,7 +144,7 @@ export const ProjectManager = () => {
                     )}
                   </div>
                   
-                  <p className="text-gray-400 text-sm line-clamp-3 leading-relaxed">
+                  <p className="text-gray-400 text-sm line-clamp-2 leading-relaxed">
                     {preview}
                   </p>
                   

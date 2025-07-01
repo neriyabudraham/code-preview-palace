@@ -49,7 +49,30 @@ const DEFAULT_HTML = `<!DOCTYPE html>
 export const HtmlEditor = () => {
   const [htmlCode, setHtmlCode] = useState(DEFAULT_HTML);
   const [fileName, setFileName] = useState("דף חדש");
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Check if there's an editing project in sessionStorage
+    const editingProject = sessionStorage.getItem("editingProject");
+    if (editingProject) {
+      try {
+        const project = JSON.parse(editingProject);
+        setHtmlCode(project.html);
+        setFileName(project.name);
+        setCurrentProjectId(project.id);
+        // Clear the sessionStorage after loading
+        sessionStorage.removeItem("editingProject");
+        
+        toast({
+          title: "פרויקט נטען",
+          description: `הפרויקט "${project.name}" נטען לעריכה`,
+        });
+      } catch (error) {
+        console.error("Error loading project:", error);
+      }
+    }
+  }, [toast]);
 
   const handleSave = () => {
     if (!fileName.trim()) {
@@ -62,19 +85,35 @@ export const HtmlEditor = () => {
     }
 
     const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
-    const project = {
-      id: Date.now().toString(),
-      name: fileName,
-      html: htmlCode,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    const existingIndex = savedProjects.findIndex((p: any) => p.name === fileName);
-    if (existingIndex !== -1) {
-      savedProjects[existingIndex] = { ...savedProjects[existingIndex], ...project, id: savedProjects[existingIndex].id };
+    
+    if (currentProjectId) {
+      // Update existing project
+      const projectIndex = savedProjects.findIndex((p: any) => p.id === currentProjectId);
+      if (projectIndex !== -1) {
+        savedProjects[projectIndex] = {
+          ...savedProjects[projectIndex],
+          name: fileName,
+          html: htmlCode,
+          updatedAt: new Date().toISOString(),
+        };
+      }
     } else {
-      savedProjects.push(project);
+      // Create new project or update by name
+      const project = {
+        id: Date.now().toString(),
+        name: fileName,
+        html: htmlCode,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const existingIndex = savedProjects.findIndex((p: any) => p.name === fileName);
+      if (existingIndex !== -1) {
+        savedProjects[existingIndex] = { ...savedProjects[existingIndex], ...project, id: savedProjects[existingIndex].id };
+      } else {
+        savedProjects.push(project);
+        setCurrentProjectId(project.id);
+      }
     }
 
     localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
@@ -88,6 +127,7 @@ export const HtmlEditor = () => {
   const handleReset = () => {
     setHtmlCode(DEFAULT_HTML);
     setFileName("דף חדש");
+    setCurrentProjectId(null);
     toast({
       title: "אופס!",
       description: "הקוד אופס למצב הבסיסי",
