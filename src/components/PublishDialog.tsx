@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -11,14 +10,32 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Globe, Loader2 } from "lucide-react";
 
+// Support both interfaces for backward compatibility
 interface PublishDialogProps {
-  projectId: string;
-  htmlContent: string;
+  // New interface with external state control
+  project?: {
+    id: string;
+    html: string;
+    name: string;
+  };
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  
+  // Legacy interface
+  projectId?: string;
+  htmlContent?: string;
   onPublished?: () => void;
 }
 
-export const PublishDialog = ({ projectId, htmlContent, onPublished }: PublishDialogProps) => {
-  const [open, setOpen] = useState(false);
+export const PublishDialog = ({ 
+  project, 
+  open: externalOpen, 
+  onOpenChange: externalOnOpenChange,
+  projectId, 
+  htmlContent, 
+  onPublished 
+}: PublishDialogProps) => {
+  const [internalOpen, setInternalOpen] = useState(false);
   const [slug, setSlug] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -27,6 +44,15 @@ export const PublishDialog = ({ projectId, htmlContent, onPublished }: PublishDi
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Use external state if provided, otherwise use internal state
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = externalOnOpenChange || setInternalOpen;
+
+  // Get project data from either interface
+  const currentProjectId = project?.id || projectId;
+  const currentHtmlContent = project?.html || htmlContent;
+  const currentProjectName = project?.name || "";
 
   const validateSlug = (slug: string) => {
     const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -65,6 +91,15 @@ export const PublishDialog = ({ projectId, htmlContent, onPublished }: PublishDi
       toast({
         title: "שגיאה",
         description: "יש להזין כותרת לדף",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!currentProjectId || !currentHtmlContent) {
+      toast({
+        title: "שגיאה",
+        description: "לא נמצא פרויקט לפרסום",
         variant: "destructive"
       });
       return;
@@ -115,10 +150,10 @@ export const PublishDialog = ({ projectId, htmlContent, onPublished }: PublishDi
       const { error } = await supabase
         .from('published_pages')
         .insert({
-          project_id: projectId,
+          project_id: currentProjectId,
           slug: slug.toLowerCase(),
           title: title.trim(),
-          html_content: htmlContent,
+          html_content: currentHtmlContent,
           user_id: user.id,
           custom_domain: domainToUse
         });
@@ -161,14 +196,99 @@ export const PublishDialog = ({ projectId, htmlContent, onPublished }: PublishDi
     }
   };
 
+  // If using legacy interface, render with trigger button
+  if (!externalOpen && !project) {
+    return (
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button className="bg-green-600 hover:bg-green-700">
+            <Globe className="w-4 h-4 ml-2" />
+            פרסם דף
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>פרסם דף</DialogTitle>
+            <DialogDescription>
+              צור קישור ציבורי לדף שלך
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">כותרת הדף</Label>
+              <Input
+                id="title"
+                placeholder="כותרת מרתקת לדף שלך"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="slug">כתובת URL</Label>
+              <div className="flex items-center">
+                <span className="text-sm text-gray-500 ml-2">
+                  {useCustomDomain && customDomain ? `${customDomain}/` : `${window.location.origin}/`}
+                </span>
+                <Input
+                  id="slug"
+                  placeholder="my-awesome-page"
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  className="flex-1"
+                  dir="ltr"
+                />
+              </div>
+              <p className="text-xs text-gray-500">
+                רק אותיות באנגלית, מספרים ומקפים (3-50 תווים)
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="use-custom-domain"
+                checked={useCustomDomain}
+                onCheckedChange={setUseCustomDomain}
+              />
+              <Label htmlFor="use-custom-domain" className="text-sm">
+                השתמש בדומיין מותאם אישית
+              </Label>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">תיאור (אופציונלי)</Label>
+              <Textarea
+                id="description"
+                placeholder="תיאור קצר של הדף"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              ביטול
+            </Button>
+            <Button onClick={handlePublish} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                  מפרסם...
+                </>
+              ) : (
+                'פרסם'
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // If using external state control, render without trigger
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-green-600 hover:bg-green-700">
-          <Globe className="w-4 h-4 ml-2" />
-          פרסם דף
-        </Button>
-      </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>פרסם דף</DialogTitle>
@@ -181,7 +301,7 @@ export const PublishDialog = ({ projectId, htmlContent, onPublished }: PublishDi
             <Label htmlFor="title">כותרת הדף</Label>
             <Input
               id="title"
-              placeholder="כותרת מרתקת לדף שלך"
+              placeholder={currentProjectName || "כותרת מרתקת לדף שלך"}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
