@@ -263,7 +263,7 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
                           className="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg transition-all duration-200 font-semibold"
                         >
                           <Share2 size={14} className="mr-1" />
-                          {isPublished ? "עדכן פרסום" : "פרסם"}
+                          {isPublished ? "פרסם מחדש" : "פרסם"}
                         </Button>
                         
                         <Button
