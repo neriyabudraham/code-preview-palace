@@ -18,11 +18,21 @@ Deno.serve(async (req) => {
     const url = new URL(req.url)
     console.log('URL pathname:', url.pathname);
     
-    // Extract slug from pathname - handle both /slug and /serve-page/slug patterns
-    let slug = url.pathname.split('/').pop();
+    // Extract slug from pathname more reliably
+    const pathParts = url.pathname.split('/').filter(part => part.length > 0);
+    let slug = '';
+    
+    if (pathParts.length > 0) {
+      // If called directly (e.g., /serve-page/myslug or just /myslug)
+      slug = pathParts[pathParts.length - 1];
+      if (slug === 'serve-page' && pathParts.length > 1) {
+        slug = pathParts[pathParts.length - 2];
+      }
+    }
+    
+    // Fallback to search params
     if (!slug || slug === 'serve-page') {
-      // Try to get slug from search params as fallback
-      slug = url.searchParams.get('slug');
+      slug = url.searchParams.get('slug') || '';
     }
     
     console.log('Extracted slug:', slug);
@@ -124,6 +134,7 @@ Deno.serve(async (req) => {
                 <div class="debug">
                     <p>נחפש עבור: ${slug}</p>
                     <p>נתיב: ${url.pathname}</p>
+                    <p>שעה: ${new Date().toLocaleString('he-IL')}</p>
                 </div>
             </div>
         </body>

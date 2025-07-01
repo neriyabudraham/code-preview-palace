@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,45 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
     }
   }, [open, project]);
 
+  const checkSlugAvailability = async (slug: string) => {
+    try {
+      // Check if the slug is available or only occupied by inactive pages
+      const { data: existingPages, error } = await supabase
+        .from('published_pages')
+        .select('id, project_id, html_content')
+        .eq('slug', slug);
+
+      if (error) {
+        console.error('Error checking slug availability:', error);
+        return { available: false, error: 'שגיאה בבדיקת זמינות הסיומת' };
+      }
+
+      // If no pages found, slug is available
+      if (!existingPages || existingPages.length === 0) {
+        return { available: true };
+      }
+
+      // Check if any of the existing pages are from different projects
+      const conflictingPages = existingPages.filter(page => page.project_id !== project.id);
+      
+      if (conflictingPages.length > 0) {
+        // Check if the conflicting pages are active (have valid HTML content)
+        const activeConflictingPages = conflictingPages.filter(page => 
+          page.html_content && page.html_content.trim().length > 0
+        );
+
+        if (activeConflictingPages.length > 0) {
+          return { available: false, error: 'הסיומת תפוסה על ידי דף פעיל אחר' };
+        }
+      }
+
+      return { available: true };
+    } catch (error) {
+      console.error('Error in checkSlugAvailability:', error);
+      return { available: false, error: 'שגיאה בבדיקת זמינות הסיומת' };
+    }
+  };
+
   const handlePublish = async () => {
     if (!customSlug.trim()) {
       toast({
@@ -66,22 +106,13 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
       const slug = customSlug.trim();
       console.log('Publishing with slug:', slug);
       
-      // Check if slug already exists (for different projects)
-      const { data: existingPage, error: checkError } = await supabase
-        .from('published_pages')
-        .select('id, project_id')
-        .eq('slug', slug)
-        .maybeSingle();
-
-      if (checkError) {
-        console.error('Error checking existing slug:', checkError);
-        throw checkError;
-      }
-
-      if (existingPage && existingPage.project_id !== project.id) {
+      // Check slug availability
+      const { available, error: availabilityError } = await checkSlugAvailability(slug);
+      
+      if (!available) {
         toast({
-          title: "הסיומת תפוסה",
-          description: "הסיומת הזו כבר בשימוש. אנא בחר סיומת אחרת.",
+          title: "הסיומת לא זמינה",
+          description: availabilityError || "הסיומת כבר בשימוש על ידי דף פעיל אחר",
           variant: "destructive"
         });
         setIsPublishing(false);
@@ -91,6 +122,13 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
       // Get project title from HTML
       const titleMatch = project.html.match(/<title[^>]*>([^<]+)<\/title>/i);
       const title = titleMatch ? titleMatch[1] : project.name;
+
+      // Delete any existing inactive pages with this slug from other projects
+      await supabase
+        .from('published_pages')
+        .delete()
+        .eq('slug', slug)
+        .neq('project_id', project.id);
 
       const publishedPageData = {
         slug,
@@ -102,13 +140,20 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
 
       console.log('Publishing page data:', publishedPageData);
 
+      // Check if this project already has a published page
+      const { data: existingProjectPage, error: existingError } = await supabase
+        .from('published_pages')
+        .select('id')
+        .eq('project_id', project.id)
+        .maybeSingle();
+
       let result;
-      if (isUpdatingExisting && existingPage) {
+      if (existingProjectPage && !existingError) {
         // Update existing published page
         result = await supabase
           .from('published_pages')
           .update(publishedPageData)
-          .eq('id', existingPage.id)
+          .eq('id', existingProjectPage.id)
           .select()
           .single();
       } else {
