@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,9 @@ import { AlertCircle, CheckCircle, Globe, Copy, ExternalLink, Unlink, Search } f
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+
+const LOVABLE_API_BASE_URL = "https://lovable-api.com/projects/79412567-53d1-4138-833e-28b721f67338/domains";
+const LOVABLE_API_TOKEN = "eyJhbGciOiJSUzI1NiIsImtpZCI6Ijg3NzQ4NTAwMmYwNWJlMDI2N2VmNDU5ZjViNTEzNTMzYjVjNThjMTIiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoi16DXqNeZ15Qg15DXkdeV15PXqNeU150iLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jS0RCaG1xcWp4S3ByMC1NOVR3OUhxcVFLRzY2QkVFQ3NMa1UxMzVveVdkaTJxUkVvYz1zOTYtYyIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJzb3VyY2Vfc2lnbl9pbl9wcm92aWRlciI6Imdvb2dsZS5jb20iLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vZ3B0LWVuZ2luZWVyLTM5MDYwNyIsImF1ZCI6ImdwdC1lbmdpbmVlci0zOTA2MDciLCJhdXRoX3RpbWUiOjE3NTEyNjYyNDUsInVzZXJfaWQiOiJPZG51NFg1R1h6VkhpemloZTV1clNROWhBTnMxIiwic3ViIjoiT2RudTRYNUdYelZIaXppaGU1dXJTUTloQU5zMSIsImlhdCI6MTc1MTM5NTc0MiwiZXhwIjoxNzUxMzk5MzQyLCJlbWFpbCI6Im9mZmljZUBuZXJpeWFidWRyYWhhbS5jby5pbCIsImZpcmViYXNlIjp7ImlkZW50aXRpZXMiOnsiZ29vZ2xlLmNvbSI6WyIxMDY0NzQzODA1MDU0OTk4MjIzMTYiXSwiZW1haWwiOlsib2ZmaWNlQG5lcml5YWJ1ZHJhaGFtLmNvLmlsIl19LCJzaWduX2luX3Byb3ZpZGVyIjoiY3VzdG9tIn19.nrXDTeQKdBtDIyuhwRpEiIBF4RL_hpGaQ88crMqN2SLYBQw_i4vgu_qBojF7Fqa5Mle0D6HT2f1DXzk-Sj2b8S0sFm0othDUWq3ddk8ELJKH3Ecq1mgKZ7MZuwfA6GhnOjZ8NBnHT-WI0C4IoRbKSg1Wzd3AMVpbeAria8-3i21loHxPKWUS6VT47ep3cCccWJ3JBRq2k-a4ztFYhOotpavSUaEwkykfUe2Z2-AFRyhtWVjMZBKnVwjbo2n8G17nk-g8n3VwjweHUPXe5BK2OCslG0eGQSEEyejAGo2jY5o9EqlEKDzYU17QEkfsz66wQM7ZxPMj7cLz6LcgGSnzWA";
 
 export const CustomDomainManager = () => {
   const [subdomain, setSubdomain] = useState("");
@@ -89,6 +91,72 @@ export const CustomDomainManager = () => {
     return '';
   };
 
+  const addDomainToLovableAPI = async (domainToAdd: string) => {
+    try {
+      console.log('Adding domain to Lovable API:', domainToAdd);
+      
+      const response = await fetch(LOVABLE_API_BASE_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          domain: domainToAdd
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to add domain to Lovable API:', response.status, errorText);
+        throw new Error(`Failed to add domain: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Domain added to Lovable API successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('Error adding domain to Lovable API:', error);
+      throw error;
+    }
+  };
+
+  const checkDomainInLovableAPI = async (domainToCheck: string) => {
+    try {
+      console.log('Checking domain in Lovable API:', domainToCheck);
+      
+      const response = await fetch(LOVABLE_API_BASE_URL, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to check domains in Lovable API:', response.status, errorText);
+        throw new Error(`Failed to check domains: ${response.status}`);
+      }
+
+      const domains = await response.json();
+      console.log('Domains from Lovable API:', domains);
+
+      // Check if the domain exists and is active
+      const domainEntry = domains.find((d: any) => d.domain === domainToCheck);
+      if (domainEntry && domainEntry.status === 'active') {
+        console.log('Domain is verified and active:', domainEntry);
+        return true;
+      } else {
+        console.log('Domain not found or not active:', domainEntry);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error checking domain in Lovable API:', error);
+      throw error;
+    }
+  };
+
   const handleSaveDomain = async () => {
     if (!user || !session) {
       toast({
@@ -125,6 +193,12 @@ export const CustomDomainManager = () => {
     try {
       console.log('Saving domain for user:', user.id, 'Domain:', fullDomain);
       
+      // First, add the domain to Lovable API
+      await addDomainToLovableAPI(fullDomain);
+      
+      // Then check if it's verified
+      const isVerified = await checkDomainInLovableAPI(fullDomain);
+      
       // Use upsert to either insert or update the profile record
       const { error } = await supabase
         .from('profiles')
@@ -132,7 +206,7 @@ export const CustomDomainManager = () => {
           id: user.id,
           email: user.email,
           custom_domain: fullDomain,
-          domain_verified: false,
+          domain_verified: isVerified,
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'id'
@@ -144,11 +218,13 @@ export const CustomDomainManager = () => {
       }
 
       setCurrentDomain(fullDomain);
-      setIsDomainVerified(false);
+      setIsDomainVerified(isVerified);
 
       toast({
         title: "נשמר בהצלחה!",
-        description: "הדומיין המותאם אישית נשמר. יש להגדיר את רשומת ה-DNS כדי להשלים את ההגדרה",
+        description: isVerified 
+          ? "הדומיין המותאם אישית נשמר ומאומת! הוא מוכן לשימוש."
+          : "הדומיין המותאם אישית נשמר. יש להגדיר את רשומת ה-DNS כדי להשלים את ההגדרה",
       });
     } catch (error: any) {
       console.error('Error saving domain:', error);
@@ -185,35 +261,33 @@ export const CustomDomainManager = () => {
     setIsCheckingDomain(true);
     
     try {
-      // For now, we'll just refresh the domain status from the database
-      // In a real implementation, you'd check DNS records here
-      const { data: profile, error } = await supabase
+      // Check domain status via Lovable API
+      const isVerified = await checkDomainInLovableAPI(fullDomain);
+      
+      // Update the database with the verification status
+      const { error } = await supabase
         .from('profiles')
-        .select('domain_verified')
+        .update({
+          domain_verified: isVerified,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', user.id)
-        .eq('custom_domain', fullDomain)
-        .maybeSingle();
+        .eq('custom_domain', fullDomain);
 
       if (error) {
+        console.error('Error updating domain verification status:', error);
         throw error;
       }
 
-      if (profile) {
-        setIsDomainVerified(profile.domain_verified || false);
-        toast({
-          title: profile.domain_verified ? "דומיין מאומת!" : "דומיין לא מאומת",
-          description: profile.domain_verified 
-            ? "הדומיין שלך מוגדר בהצלחה ופועל" 
-            : "הדומיין עדיין לא מאומת. אנא וודא שהגדרת את רשומת ה-DNS",
-          variant: profile.domain_verified ? "default" : "destructive"
-        });
-      } else {
-        toast({
-          title: "הדומיין לא נמצא",
-          description: "יש לשמור את הדומיין לפני בדיקתו",
-          variant: "destructive"
-        });
-      }
+      setIsDomainVerified(isVerified);
+      
+      toast({
+        title: isVerified ? "דומיין מאומת!" : "דומיין לא מאומת",
+        description: isVerified 
+          ? "הדומיין שלך מוגדר בהצלחה ופועל" 
+          : "הדומיין עדיין לא מאומת. אנא וודא שהגדרת את רשומת ה-DNS",
+        variant: isVerified ? "default" : "destructive"
+      });
     } catch (error: any) {
       console.error('Error checking domain:', error);
       toast({
@@ -410,7 +484,7 @@ export const CustomDomainManager = () => {
                 disabled={isLoading || !fullDomain}
                 className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
               >
-                {isLoading ? "שומר..." : "שמור דומיין"}
+                {isLoading ? "שומר ובודק..." : "שמור דומיין"}
               </Button>
               
               {currentDomain && (
@@ -494,6 +568,18 @@ export const CustomDomainManager = () => {
                 <p className="text-sm text-orange-300 mt-2">
                   לאחר הגדרת רשומת ה-DNS, הדפים שלך יהיו זמינים בדומיין החדש תוך מספר שעות.
                   ניתן ללחוץ על "בדוק דומיין" כדי לבדוק את הסטטוס.
+                </p>
+              </div>
+            )}
+
+            {isDomainVerified && (
+              <div className="bg-green-900/20 border border-green-700/50 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-green-400">
+                  <CheckCircle className="w-5 h-5" />
+                  <span className="font-semibold">הדומיין מאומת ופעיל!</span>
+                </div>
+                <p className="text-sm text-green-300 mt-2">
+                  הדומיין שלך מוגדר בהצלחה. כל הדפים שתפרסם יהיו זמינים בדומיין המותאם שלך.
                 </p>
               </div>
             )}
