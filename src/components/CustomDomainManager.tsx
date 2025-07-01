@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, Globe, Copy, ExternalLink, Unlink, Search } from "lucide-react";
+import { Globe, Copy, ExternalLink, Unlink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,8 +15,6 @@ export const CustomDomainManager = () => {
   const [currentDomain, setCurrentDomain] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
-  const [isCheckingDomain, setIsCheckingDomain] = useState(false);
-  const [isDomainVerified, setIsDomainVerified] = useState(false);
   const { toast } = useToast();
   const { user, session } = useAuth();
 
@@ -32,7 +30,7 @@ export const CustomDomainManager = () => {
         console.log('Loading domain config for user:', user.id);
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('custom_domain, domain_verified')
+          .select('custom_domain')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -48,7 +46,6 @@ export const CustomDomainManager = () => {
 
         if (profile) {
           setCurrentDomain(profile.custom_domain);
-          setIsDomainVerified(profile.domain_verified || false);
           
           // Parse existing domain into subdomain and domain parts
           if (profile.custom_domain) {
@@ -132,7 +129,6 @@ export const CustomDomainManager = () => {
           id: user.id,
           email: user.email,
           custom_domain: fullDomain,
-          domain_verified: false,
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'id'
@@ -144,11 +140,10 @@ export const CustomDomainManager = () => {
       }
 
       setCurrentDomain(fullDomain);
-      setIsDomainVerified(false);
 
       toast({
-        title: "נשמר בהצלחה!",
-        description: "הדומיין המותאם אישית נשמר. יש להגדיר את רשומת ה-DNS כדי להשלים את ההגדרה",
+        title: "נשמר בהצלחה! 🎉",
+        description: "הדומיין המותאם אישית נשמר ומוכן לשימוש",
       });
     } catch (error: any) {
       console.error('Error saving domain:', error);
@@ -171,61 +166,6 @@ export const CustomDomainManager = () => {
     }
   };
 
-  const handleCheckDomain = async () => {
-    const fullDomain = getFullDomain();
-    if (!fullDomain || !user) {
-      toast({
-        title: "שגיאה",
-        description: "יש להזין דומיין תקין ולהתחבר למערכת",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsCheckingDomain(true);
-    
-    try {
-      // For now, we'll just refresh the domain status from the database
-      // In a real implementation, you'd check DNS records here
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('domain_verified')
-        .eq('id', user.id)
-        .eq('custom_domain', fullDomain)
-        .maybeSingle();
-
-      if (error) {
-        throw error;
-      }
-
-      if (profile) {
-        setIsDomainVerified(profile.domain_verified || false);
-        toast({
-          title: profile.domain_verified ? "דומיין מאומת!" : "דומיין לא מאומת",
-          description: profile.domain_verified 
-            ? "הדומיין שלך מוגדר בהצלחה ופועל" 
-            : "הדומיין עדיין לא מאומת. אנא וודא שהגדרת את רשומת ה-DNS",
-          variant: profile.domain_verified ? "default" : "destructive"
-        });
-      } else {
-        toast({
-          title: "הדומיין לא נמצא",
-          description: "יש לשמור את הדומיין לפני בדיקתו",
-          variant: "destructive"
-        });
-      }
-    } catch (error: any) {
-      console.error('Error checking domain:', error);
-      toast({
-        title: "שגיאה בבדיקת הדומיין",
-        description: "לא ניתן לבדוק את סטטוס הדומיין כרגע",
-        variant: "destructive"
-      });
-    } finally {
-      setIsCheckingDomain(false);
-    }
-  };
-
   const handleDisconnectDomain = async () => {
     if (!user || !session) {
       toast({
@@ -245,7 +185,6 @@ export const CustomDomainManager = () => {
         .from('profiles')
         .update({
           custom_domain: null,
-          domain_verified: false,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
@@ -256,7 +195,6 @@ export const CustomDomainManager = () => {
       }
 
       setCurrentDomain(null);
-      setIsDomainVerified(false);
       setSubdomain("");
       setDomain("");
 
@@ -327,20 +265,11 @@ export const CustomDomainManager = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge 
-                    variant={isDomainVerified ? "default" : "destructive"}
-                    className={isDomainVerified ? "bg-green-600" : "bg-orange-600"}
+                    variant="default"
+                    className="bg-green-600"
                   >
-                    {isDomainVerified ? (
-                      <>
-                        <CheckCircle className="w-4 h-4 mr-1" />
-                        מאומת
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle className="w-4 h-4 mr-1" />
-                        לא מאומת
-                      </>
-                    )}
+                    <Globe className="w-4 h-4 mr-1" />
+                    מחובר
                   </Badge>
                   <Button
                     size="sm"
@@ -404,102 +333,85 @@ export const CustomDomainManager = () => {
               </div>
             )}
 
-            <div className="flex gap-3">
-              <Button
-                onClick={handleSaveDomain}
-                disabled={isLoading || !fullDomain}
-                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-              >
-                {isLoading ? "שומר..." : "שמור דומיין"}
-              </Button>
-              
-              {currentDomain && (
-                <Button
-                  onClick={handleCheckDomain}
-                  disabled={isCheckingDomain}
-                  variant="outline"
-                  className="border-green-600 text-green-400 hover:bg-green-900/20"
-                >
-                  <Search className="w-4 h-4 mr-1" />
-                  {isCheckingDomain ? "בודק..." : "בדוק דומיין"}
-                </Button>
-              )}
-            </div>
+            <Button
+              onClick={handleSaveDomain}
+              disabled={isLoading || !fullDomain}
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            >
+              {isLoading ? "שומר..." : "שמור דומיין"}
+            </Button>
           </div>
         </div>
       </Card>
 
-      {currentDomain && (
-        <Card className="bg-gradient-to-br from-blue-900/20 via-purple-900/20 to-slate-900 border-blue-700/50 p-6">
-          <div className="space-y-4">
-            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-              <Globe className="w-5 h-5 text-blue-400" />
-              הוראות חיבור DNS
-            </h3>
+      <Card className="bg-gradient-to-br from-blue-900/20 via-purple-900/20 to-slate-900 border-blue-700/50 p-6">
+        <div className="space-y-4">
+          <h3 className="text-xl font-bold text-white flex items-center gap-2">
+            <Globe className="w-5 h-5 text-blue-400" />
+            הוראות חיבור DNS
+          </h3>
+          
+          <div className="bg-slate-800 rounded-lg p-4 border border-slate-600">
+            <p className="text-sm text-slate-300 mb-4">
+              להשלמת החיבור, יש להוסיף רשומת A בהגדרות ה-DNS של הדומיין:
+            </p>
             
-            <div className="bg-slate-800 rounded-lg p-4 border border-slate-600">
-              <p className="text-sm text-slate-300 mb-4">
-                להשלמת החיבור, יש להוסיף רשומת A בהגדרות ה-DNS של הדומיין:
-              </p>
-              
-              <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-4 text-sm font-semibold text-slate-400 border-b border-slate-600 pb-2">
-                  <div>סוג רשומה</div>
-                  <div>שם מארח</div>
-                  <div>ערך נדרש</div>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 items-center">
-                  <div className="bg-slate-700 rounded px-3 py-2 text-white font-mono text-sm">
-                    A
-                  </div>
-                  <div className="bg-slate-700 rounded px-3 py-2 text-white font-mono text-sm flex items-center gap-2">
-                    <span className="truncate">{currentDomain}</span>
-                    <Button
-                      onClick={() => copyDNSRecord(currentDomain)}
-                      size="sm"
-                      variant="ghost"
-                      className="p-1 h-6 w-6 hover:bg-slate-600"
-                    >
-                      <Copy size={12} />
-                    </Button>
-                  </div>
-                  <div className="bg-slate-700 rounded px-3 py-2 text-white font-mono text-sm flex items-center gap-2">
-                    <span>185.158.133.1</span>
-                    <Button
-                      onClick={() => copyDNSRecord("185.158.133.1")}
-                      size="sm"
-                      variant="ghost"
-                      className="p-1 h-6 w-6 hover:bg-slate-600"
-                    >
-                      <Copy size={12} />
-                    </Button>
-                  </div>
-                </div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-4 text-sm font-semibold text-slate-400 border-b border-slate-600 pb-2">
+                <div>סוג רשומה</div>
+                <div>שם מארח</div>
+                <div>ערך נדרש</div>
               </div>
               
-              <div className="mt-4 text-xs text-slate-400 space-y-1">
-                <p>• היכנס לפאנל הניהול של הדומיין שלך</p>
-                <p>• הוסף רשומת A עם השם "{currentDomain}" המצביעה לכתובת 185.158.133.1</p>
-                <p>• השינוי עשוי לקחת עד 48 שעות להפצה מלאה</p>
+              <div className="grid grid-cols-3 gap-4 items-center">
+                <div className="bg-slate-700 rounded px-3 py-2 text-white font-mono text-sm">
+                  A
+                </div>
+                <div className="bg-slate-700 rounded px-3 py-2 text-white font-mono text-sm flex items-center gap-2">
+                  <span className="truncate">{currentDomain || fullDomain || "@"}</span>
+                  <Button
+                    onClick={() => copyDNSRecord(currentDomain || fullDomain || "@")}
+                    size="sm"
+                    variant="ghost"
+                    className="p-1 h-6 w-6 hover:bg-slate-600"
+                  >
+                    <Copy size={12} />
+                  </Button>
+                </div>
+                <div className="bg-slate-700 rounded px-3 py-2 text-white font-mono text-sm flex items-center gap-2">
+                  <span>185.158.133.1</span>
+                  <Button
+                    onClick={() => copyDNSRecord("185.158.133.1")}
+                    size="sm"
+                    variant="ghost"
+                    className="p-1 h-6 w-6 hover:bg-slate-600"
+                  >
+                    <Copy size={12} />
+                  </Button>
+                </div>
               </div>
             </div>
-
-            {!isDomainVerified && (
-              <div className="bg-orange-900/20 border border-orange-700/50 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-orange-400">
-                  <AlertCircle className="w-5 h-5" />
-                  <span className="font-semibold">הדומיין עדיין לא מאומת</span>
-                </div>
-                <p className="text-sm text-orange-300 mt-2">
-                  לאחר הגדרת רשומת ה-DNS, הדפים שלך יהיו זמינים בדומיין החדש תוך מספר שעות.
-                  ניתן ללחוץ על "בדוק דומיין" כדי לבדוק את הסטטוס.
-                </p>
-              </div>
-            )}
+            
+            <div className="mt-4 text-xs text-slate-400 space-y-1">
+              <p>• היכנס לפאנל הניהול של הדומיין שלך</p>
+              <p>• הוסף רשומת A עם השם "{currentDomain || fullDomain || "הדומיין שלך"}" המצביעה לכתובת 185.158.133.1</p>
+              <p>• השינוי עשוי לקחת עד 48 שעות להפצה מלאה</p>
+              <p>• לאחר הגדרת ה-DNS, כל הדפים שלך יהיו זמינים תחת הדומיין החדש</p>
+            </div>
           </div>
-        </Card>
-      )}
+
+          <div className="bg-green-900/20 border border-green-700/50 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-green-400">
+              <Globe className="w-5 h-5" />
+              <span className="font-semibold">הדומיין מוכן לשימוש</span>
+            </div>
+            <p className="text-sm text-green-300 mt-2">
+              לאחר הגדרת רשומת ה-DNS בספק הדומיין שלך, כל הדפים המפורסמים יהיו זמינים 
+              תחת הדומיין המותאם אישית שלך תוך מספר שעות.
+            </p>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 };

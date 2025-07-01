@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Load user's custom domain - removed verification requirement
+  // Load user's custom domain
   useEffect(() => {
     const loadUserDomain = async () => {
       if (!user) return;
@@ -40,7 +41,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
           return;
         }
 
-        // Use custom domain if exists, no verification check needed
+        // Use custom domain if exists
         if (profile && profile.custom_domain) {
           setUserDomain(profile.custom_domain);
         }
@@ -126,7 +127,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
         title,
         html_content: project.html,
         updated_at: new Date().toISOString(),
-        // Add custom domain without verification requirement
+        // Add custom domain
         custom_domain: userDomain
       };
 
@@ -244,7 +245,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
         html_content: project.html,
         project_id: project.id,
         user_id: user.id,
-        // Add custom domain without verification requirement
+        // Add custom domain
         custom_domain: userDomain
       };
 
@@ -390,10 +391,10 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
             </div>
             
             {userDomain && (
-              <div className="mt-3 p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700">
+              <div className="mt-3 p-3 bg-green-100 dark:bg-green-900/30 rounded-lg border border-green-200 dark:border-green-700">
                 <div className="flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  <span className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                  <Globe className="w-4 h-4 text-green-600 dark:text-green-400" />
+                  <span className="text-sm font-medium text-green-800 dark:text-green-300">
                     יפורסם בדומיין המותאם שלך: {userDomain}
                   </span>
                 </div>
