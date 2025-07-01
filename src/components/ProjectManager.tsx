@@ -6,8 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { HtmlPreview } from "./HtmlPreview";
-import { Edit, Trash2, Eye, Download, Search } from "lucide-react";
+import { Edit, Trash2, Eye, Download, Search, Copy, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+interface ProjectVersion {
+  id: string;
+  html: string;
+  savedAt: string;
+  version: number;
+}
 
 interface Project {
   id: string;
@@ -15,6 +22,7 @@ interface Project {
   html: string;
   createdAt: string;
   updatedAt: string;
+  versions?: ProjectVersion[];
 }
 
 interface ProjectManagerProps {
@@ -60,6 +68,27 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
     });
   };
 
+  const duplicateProject = (project: Project) => {
+    const duplicatedProject = {
+      ...project,
+      id: Date.now().toString(),
+      name: `${project.name} - עותק`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      versions: [] // Reset versions for duplicate
+    };
+    
+    const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
+    savedProjects.push(duplicatedProject);
+    localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
+    setProjects(savedProjects);
+    
+    toast({
+      title: "שוכפל בהצלחה",
+      description: `נוצר עותק של "${project.name}"`,
+    });
+  };
+
   const downloadProject = (project: Project) => {
     const blob = new Blob([project.html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
@@ -75,6 +104,37 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
       title: "הורדה החלה",
       description: `הקובץ ${project.name}.html נשמר למחשב`,
     });
+  };
+
+  const restoreVersion = (project: Project, version: ProjectVersion) => {
+    const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
+    const projectIndex = savedProjects.findIndex((p: any) => p.id === project.id);
+    
+    if (projectIndex !== -1) {
+      // Create a new version entry for the current state before restoring
+      if (!savedProjects[projectIndex].versions) {
+        savedProjects[projectIndex].versions = [];
+      }
+      
+      savedProjects[projectIndex].versions.unshift({
+        id: Date.now().toString() + "_current",
+        html: savedProjects[projectIndex].html,
+        savedAt: savedProjects[projectIndex].updatedAt,
+        version: (savedProjects[projectIndex].versions.length || 0) + 1
+      });
+      
+      // Restore the selected version
+      savedProjects[projectIndex].html = version.html;
+      savedProjects[projectIndex].updatedAt = new Date().toISOString();
+      
+      localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
+      setProjects(savedProjects);
+      
+      toast({
+        title: "גירסה שוחזרה",
+        description: `גירסה ${version.version} של "${project.name}" שוחזרה`,
+      });
+    }
   };
 
   const getPreviewText = (html: string) => {
@@ -128,7 +188,7 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => {
-            const { title, preview } = getPreviewText(project.html);
+            const { title } = getPreviewText(project.html);
             
             return (
               <Card key={project.id} className="bg-gray-800 border-gray-700 hover:bg-gray-750 transition-colors overflow-hidden">
@@ -144,18 +204,20 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
                     )}
                   </div>
                   
-                  <p className="text-gray-400 text-sm line-clamp-2 leading-relaxed">
-                    {preview}
-                  </p>
-                  
                   <div className="text-xs text-gray-500">
                     <p>נוצר: {formatDate(project.createdAt)}</p>
                     {project.updatedAt !== project.createdAt && (
                       <p>עודכן: {formatDate(project.updatedAt)}</p>
                     )}
+                    {project.versions && project.versions.length > 0 && (
+                      <p className="flex items-center gap-1">
+                        <Clock size={12} />
+                        {project.versions.length} גירסאות
+                      </p>
+                    )}
                   </div>
                   
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex gap-2 pt-2 flex-wrap">
                     <Button
                       size="sm"
                       onClick={() => editProject(project)}
@@ -168,6 +230,16 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
                     <Button
                       size="sm"
                       variant="outline"
+                      onClick={() => duplicateProject(project)}
+                      className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                    >
+                      <Copy size={14} className="mr-1" />
+                      שכפל
+                    </Button>
+                    
+                    <Button
+                      size="sm"
+                      variant="outline"
                       onClick={() => downloadProject(project)}
                       className="border-gray-600 text-gray-300 hover:bg-gray-700"
                     >
@@ -175,9 +247,37 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
                       הורד
                     </Button>
                     
+                    {project.versions && project.versions.length > 0 && (
+                      <details className="w-full">
+                        <summary className="cursor-pointer text-xs text-gray-400 hover:text-gray-300 list-none">
+                          <span className="flex items-center gap-1">
+                            <Clock size={12} />
+                            גירסאות קודמות
+                          </span>
+                        </summary>
+                        <div className="mt-2 space-y-1">
+                          {project.versions.slice(0, 5).map((version) => (
+                            <div key={version.id} className="flex items-center justify-between text-xs">
+                              <span className="text-gray-400">
+                                גירסה {version.version} - {formatDate(version.savedAt)}
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => restoreVersion(project, version)}
+                                className="h-6 px-2 text-xs text-gray-400 hover:text-white"
+                              >
+                                שחזר
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                    
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="destructive">
+                        <Button size="sm" variant="destructive" className="w-full mt-2">
                           <Trash2 size={14} className="mr-1" />
                           מחק
                         </Button>
