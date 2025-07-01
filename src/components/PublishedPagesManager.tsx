@@ -20,25 +20,11 @@ interface PublishedPage {
 export const PublishedPagesManager = () => {
   const [publishedPages, setPublishedPages] = useState<PublishedPage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { toast } = useToast();
 
-  // Check authentication and load pages
+  // Load pages on component mount
   useEffect(() => {
-    const checkAuthAndLoadPages = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        setIsAuthenticated(false);
-        setIsLoading(false);
-        return;
-      }
-      
-      setIsAuthenticated(true);
-      await loadPublishedPages();
-    };
-
-    checkAuthAndLoadPages();
+    loadPublishedPages();
   }, []);
 
   const loadPublishedPages = async () => {
@@ -120,18 +106,6 @@ export const PublishedPagesManager = () => {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         <span className="mr-3 text-slate-400">טוען דפים מפורסמים...</span>
       </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <Card className="p-8 bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800 border-slate-700 text-center shadow-xl">
-        <Globe className="mx-auto mb-4 text-slate-400" size={48} />
-        <h3 className="text-xl font-bold text-white mb-2">דרושה התחברות</h3>
-        <p className="text-slate-400">
-          יש להתחבר כדי לצפות בדפים המפורסמים
-        </p>
-      </Card>
     );
   }
 

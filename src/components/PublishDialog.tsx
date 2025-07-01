@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, ExternalLink, Share2, Globe, CheckCircle, Link, AlertTriangle } from "lucide-react";
+import { Copy, ExternalLink, Share2, Globe, CheckCircle, Link } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -18,23 +18,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
   const [customSlug, setCustomSlug] = useState("");
   const [isPublishing, setIsPublishing] = useState(false);
   const [isUpdatingExisting, setIsUpdatingExisting] = useState(false);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { toast } = useToast();
-
-  // Check authentication status
-  useEffect(() => {
-    const checkAuth = async () => {
-      setIsCheckingAuth(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      setIsAuthenticated(!!user);
-      setIsCheckingAuth(false);
-    };
-    
-    if (open) {
-      checkAuth();
-    }
-  }, [open]);
 
   // Initialize the dialog state when it opens
   useEffect(() => {
@@ -57,15 +41,6 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
   }, [open, project]);
 
   const handlePublish = async () => {
-    if (!isAuthenticated) {
-      toast({
-        title: "דרושה הרשמה",
-        description: "יש להתחבר כדי לפרסם דפים",
-        variant: "destructive"
-      });
-      return;
-    }
-
     if (!customSlug.trim()) {
       toast({
         title: "שגיאה",
@@ -89,11 +64,6 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
     setIsPublishing(true);
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error("User not authenticated");
-      }
-
       const slug = customSlug.trim();
       
       // Check if slug already exists (for different projects)
@@ -122,7 +92,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
         title,
         html_content: project.html,
         project_id: project.id,
-        user_id: user.id
+        user_id: null // No authentication required
       };
 
       let result;
@@ -208,83 +178,6 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
     setCustomSlug("");
     setIsUpdatingExisting(false);
   };
-
-  const handleSignIn = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin
-        }
-      });
-      
-      if (error) {
-        toast({
-          title: "שגיאה בהתחברות",
-          description: error.message,
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error("Sign in error:", error);
-      toast({
-        title: "שגיאה בהתחברות",
-        description: "אירעה שגיאה בעת ההתחברות. אנא נסה שנית.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  if (isCheckingAuth) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white max-w-lg shadow-2xl">
-          <div className="flex items-center justify-center p-8">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600 dark:text-gray-400">בודק מצב התחברות...</p>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white max-w-lg shadow-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-3xl font-bold text-center bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              דרושה הרשמה
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-6">
-            <div className="text-center py-6">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Globe size={32} className="text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                כדי לפרסם דפים אתה צריך להתחבר
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400 text-sm max-w-sm mx-auto">
-                ההתחברות נדרשת כדי לשמור ולנהל את הדפים המפורסמים שלך
-              </p>
-            </div>
-
-            <Button 
-              onClick={handleSignIn}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all duration-300 transform hover:scale-105 px-8 py-4 text-lg font-bold rounded-xl h-14"
-            >
-              <Globe size={24} className="mr-3" />
-              התחבר עם Google
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
