@@ -7,6 +7,8 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req) => {
+  console.log('Request received:', req.method, req.url);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -14,9 +16,19 @@ Deno.serve(async (req) => {
 
   try {
     const url = new URL(req.url)
-    const slug = url.pathname.split('/').pop()
+    console.log('URL pathname:', url.pathname);
+    
+    // Extract slug from pathname - handle both /slug and /serve-page/slug patterns
+    let slug = url.pathname.split('/').pop();
+    if (!slug || slug === 'serve-page') {
+      // Try to get slug from search params as fallback
+      slug = url.searchParams.get('slug');
+    }
+    
+    console.log('Extracted slug:', slug);
 
     if (!slug) {
+      console.log('No slug found, returning 404');
       return new Response('Page not found', { 
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'text/html' }
@@ -24,19 +36,42 @@ Deno.serve(async (req) => {
     }
 
     // Initialize Supabase client
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
+    
+    console.log('Supabase URL configured:', !!supabaseUrl);
+    console.log('Supabase Key configured:', !!supabaseKey);
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing Supabase configuration');
+      return new Response('Server configuration error', { 
+        status: 500,
+        headers: corsHeaders
+      });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get the published page by slug
+    console.log('Querying for slug:', slug);
     const { data: page, error } = await supabase
       .from('published_pages')
       .select('html_content, title')
       .eq('slug', slug)
-      .single()
+      .maybeSingle();
 
-    if (error || !page) {
+    console.log('Query result:', { page: !!page, error });
+
+    if (error) {
+      console.error('Database error:', error);
+      return new Response('Database error', { 
+        status: 500,
+        headers: corsHeaders
+      });
+    }
+
+    if (!page) {
+      console.log('Page not found in database for slug:', slug);
       return new Response(`
         <!DOCTYPE html>
         <html lang="he" dir="rtl">
@@ -73,6 +108,12 @@ Deno.serve(async (req) => {
                     font-size: 1.2rem;
                     opacity: 0.8;
                 }
+                .debug {
+                    font-size: 0.8rem;
+                    opacity: 0.6;
+                    margin-top: 2rem;
+                    font-family: monospace;
+                }
             </style>
         </head>
         <body>
@@ -80,6 +121,10 @@ Deno.serve(async (req) => {
                 <h1>404</h1>
                 <p>הדף שחיפשת לא נמצא</p>
                 <p>יתכן שהקישור שגוי או שהדף הוסר</p>
+                <div class="debug">
+                    <p>נחפש עבור: ${slug}</p>
+                    <p>נתיב: ${url.pathname}</p>
+                </div>
             </div>
         </body>
         </html>
@@ -89,6 +134,7 @@ Deno.serve(async (req) => {
       })
     }
 
+    console.log('Serving page for slug:', slug);
     // Return the HTML content
     return new Response(page.html_content, {
       status: 200,
@@ -100,7 +146,7 @@ Deno.serve(async (req) => {
     })
 
   } catch (error) {
-    console.error('Error serving page:', error)
+    console.error('Unexpected error:', error)
     return new Response('Internal Server Error', { 
       status: 500,
       headers: corsHeaders
