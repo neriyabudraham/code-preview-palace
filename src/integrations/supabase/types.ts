@@ -12,18 +12,24 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          custom_domain: string | null
+          domain_verified: boolean | null
           email: string | null
           id: string
           updated_at: string
         }
         Insert: {
           created_at?: string
+          custom_domain?: string | null
+          domain_verified?: boolean | null
           email?: string | null
           id: string
           updated_at?: string
         }
         Update: {
           created_at?: string
+          custom_domain?: string | null
+          domain_verified?: boolean | null
           email?: string | null
           id?: string
           updated_at?: string
@@ -33,6 +39,7 @@ export type Database = {
       published_pages: {
         Row: {
           created_at: string
+          custom_domain: string | null
           html_content: string
           id: string
           project_id: string
@@ -43,6 +50,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          custom_domain?: string | null
           html_content: string
           id?: string
           project_id: string
@@ -53,6 +61,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          custom_domain?: string | null
           html_content?: string
           id?: string
           project_id?: string

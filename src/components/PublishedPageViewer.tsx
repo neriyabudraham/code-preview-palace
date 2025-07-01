@@ -21,12 +21,22 @@ export const PublishedPageViewer = () => {
       try {
         console.log('Fetching page for slug:', slug);
         
-        // Fetch the published page directly from the database
-        const { data: page, error: dbError } = await supabase
+        // First, try to find the page by slug
+        let query = supabase
           .from('published_pages')
-          .select('html_content, title')
-          .eq('slug', slug)
-          .maybeSingle();
+          .select('html_content, title, custom_domain')
+          .eq('slug', slug);
+
+        // Check if we're accessing via custom domain
+        const currentHost = window.location.hostname;
+        const isCustomDomain = !currentHost.includes('lovable') && currentHost !== 'localhost';
+
+        if (isCustomDomain) {
+          // If accessing via custom domain, also check custom_domain field
+          query = query.or(`custom_domain.eq.${currentHost}`);
+        }
+
+        const { data: page, error: dbError } = await query.maybeSingle();
 
         if (dbError) {
           console.error('Database error:', dbError);
@@ -37,6 +47,14 @@ export const PublishedPageViewer = () => {
 
         if (!page) {
           console.log('Page not found for slug:', slug);
+          setError("הדף לא נמצא");
+          setLoading(false);
+          return;
+        }
+
+        // If we're on a custom domain, verify it matches the page's custom domain
+        if (isCustomDomain && page.custom_domain !== currentHost) {
+          console.log('Custom domain mismatch');
           setError("הדף לא נמצא");
           setLoading(false);
           return;

@@ -2,9 +2,10 @@
 import { useState } from "react";
 import { HtmlEditor } from "@/components/HtmlEditor";
 import { ProjectManager } from "@/components/ProjectManager";
+import { CustomDomainManager } from "@/components/CustomDomainManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Code, FolderOpen, LogOut, User } from "lucide-react";
+import { Code, FolderOpen, LogOut, User, Globe } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
@@ -68,7 +69,7 @@ const Index = () => {
       
       <div className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-gray-800 border-gray-700">
+          <TabsList className="grid w-full grid-cols-3 bg-gray-800 border-gray-700">
             <TabsTrigger value="editor" className="flex items-center gap-2">
               <Code size={16} />
               עריכה
@@ -76,6 +77,10 @@ const Index = () => {
             <TabsTrigger value="projects" className="flex items-center gap-2">
               <FolderOpen size={16} />
               הפרויקטים שלי
+            </TabsTrigger>
+            <TabsTrigger value="domains" className="flex items-center gap-2">
+              <Globe size={16} />
+              דומיינים
             </TabsTrigger>
           </TabsList>
           
@@ -85,6 +90,10 @@ const Index = () => {
           
           <TabsContent value="projects" className="mt-6">
             <ProjectManager onEditProject={handleEditProject} />
+          </TabsContent>
+          
+          <TabsContent value="domains" className="mt-6">
+            <CustomDomainManager />
           </TabsContent>
         </Tabs>
       </div>
