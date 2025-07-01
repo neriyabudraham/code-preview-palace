@@ -25,7 +25,7 @@ export const HtmlPreview = ({ html }: HtmlPreviewProps) => {
       <iframe
         ref={iframeRef}
         className="w-full h-full"
-        sandbox="allow-scripts"
+        sandbox="allow-scripts allow-same-origin"
         title="HTML Preview"
       />
     </div>
