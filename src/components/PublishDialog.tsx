@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -65,13 +64,19 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
     
     try {
       const slug = customSlug.trim();
+      console.log('Publishing with slug:', slug);
       
       // Check if slug already exists (for different projects)
-      const { data: existingPage } = await supabase
+      const { data: existingPage, error: checkError } = await supabase
         .from('published_pages')
         .select('id, project_id')
         .eq('slug', slug)
-        .single();
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking existing slug:', checkError);
+        throw checkError;
+      }
 
       if (existingPage && existingPage.project_id !== project.id) {
         toast({
@@ -91,9 +96,11 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
         slug,
         title,
         html_content: project.html,
-        project_id: project.id,
-        user_id: null // No authentication required
+        project_id: project.id
+        // Remove user_id field since we want to allow anonymous publishing
       };
+
+      console.log('Publishing page data:', publishedPageData);
 
       let result;
       if (isUpdatingExisting && existingPage) {
@@ -113,7 +120,10 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
           .single();
       }
 
+      console.log('Publish result:', result);
+
       if (result.error) {
+        console.error('Publishing error details:', result.error);
         throw result.error;
       }
 
@@ -140,9 +150,22 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
       setIsUpdatingExisting(true);
     } catch (error) {
       console.error("Publishing error:", error);
+      
+      // Provide more specific error messages
+      let errorMessage = "אירעה שגיאה בעת פרסום הדף. אנא נסה שנית.";
+      
+      if (error && typeof error === 'object' && 'message' in error) {
+        const errorMsg = (error as any).message;
+        if (errorMsg.includes('row-level security policy')) {
+          errorMessage = "שגיאת הרשאות. אנא פנה למנהל המערכת.";
+        } else if (errorMsg.includes('duplicate key')) {
+          errorMessage = "הסיומת כבר קיימת. אנא בחר סיומת אחרת.";
+        }
+      }
+      
       toast({
         title: "שגיאה בפרסום",
-        description: "אירעה שגיאה בעת פרסום הדף. אנא נסה שנית.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
