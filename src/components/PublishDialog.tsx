@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, ExternalLink, Share2, Globe, CheckCircle, Link } from "lucide-react";
+import { Copy, ExternalLink, Share2, Globe, CheckCircle, Link, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -17,6 +17,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
   const [publishedUrl, setPublishedUrl] = useState("");
   const [customSlug, setCustomSlug] = useState("");
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isRepublishing, setIsRepublishing] = useState(false);
   const [isUpdatingExisting, setIsUpdatingExisting] = useState(false);
   const { toast } = useToast();
 
@@ -76,6 +77,80 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
     } catch (error) {
       console.error('Error in checkSlugAvailability:', error);
       return { available: false, error: 'שגיאה בבדיקת זמינות הסיומת' };
+    }
+  };
+
+  const handleRepublish = async () => {
+    if (!isUpdatingExisting || !customSlug.trim()) {
+      return;
+    }
+
+    setIsRepublishing(true);
+    
+    try {
+      const slug = customSlug.trim();
+      console.log('Republishing with slug:', slug);
+      
+      // Get project title from HTML
+      const titleMatch = project.html.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const title = titleMatch ? titleMatch[1] : project.name;
+
+      const publishedPageData = {
+        title,
+        html_content: project.html,
+        updated_at: new Date().toISOString()
+      };
+
+      console.log('Republishing page data:', publishedPageData);
+
+      // Update existing published page
+      const result = await supabase
+        .from('published_pages')
+        .update(publishedPageData)
+        .eq('project_id', project.id)
+        .eq('slug', slug)
+        .select()
+        .single();
+
+      console.log('Republish result:', result);
+
+      if (result.error) {
+        console.error('Republishing error details:', result.error);
+        throw result.error;
+      }
+      
+      // Update project in localStorage
+      const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
+      const projectIndex = savedProjects.findIndex((p: any) => p.id === project.id);
+      if (projectIndex !== -1) {
+        savedProjects[projectIndex].publishedAt = new Date().toISOString();
+        localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
+      }
+      
+      toast({
+        title: "פורסם מחדש בהצלחה! 🎉",
+        description: `הפרויקט "${project.name}" עודכן עם התוכן החדש`,
+      });
+      
+    } catch (error) {
+      console.error("Republishing error:", error);
+      
+      let errorMessage = "אירעה שגיאה בעת פרסום מחדש. אנא נסה שנית.";
+      
+      if (error && typeof error === 'object' && 'message' in error) {
+        const errorMsg = (error as any).message;
+        if (errorMsg.includes('row-level security policy')) {
+          errorMessage = "שגיאת הרשאות. אנא פנה למנהל המערכת.";
+        }
+      }
+      
+      toast({
+        title: "שגיאה בפרסום מחדש",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setIsRepublishing(false);
     }
   };
 
@@ -388,6 +463,16 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
                   שתף
                 </Button>
               </div>
+
+              {/* Republish Button - New Feature */}
+              <Button 
+                onClick={handleRepublish}
+                disabled={isRepublishing}
+                className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white shadow-lg transition-all duration-300 transform hover:scale-105 font-bold py-3 rounded-xl"
+              >
+                <RefreshCw size={18} className={`mr-2 ${isRepublishing ? 'animate-spin' : ''}`} />
+                {isRepublishing ? "מפרסם מחדש..." : "פרסם מחדש"}
+              </Button>
 
               <Button 
                 onClick={resetToNewPublish}
