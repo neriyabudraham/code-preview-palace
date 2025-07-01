@@ -9,10 +9,6 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
-const LOVABLE_API_BASE_URL = "https://lovable-api.com/projects/79412567-53d1-4138-833e-28b721f67338/domains";
-const LOVABLE_AUTH_TOKEN_URL = "https://lovable-api.com/projects/79412567-53d1-4138-833e-28b721f67338/auth-token";
-const LOVABLE_API_TOKEN = "eyJhbGciOiJSUzI1NiIsImtpZCI6Ijg3NzQ4NTAwMmYwNWJlMDI2N2VmNDU5ZjViNTEzNTMzYjVjNThjMTIiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoi16DXqNeZ15Qg15DXkdeV15PXqNeU150iLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jS0RCaG1xcWp4S3ByMC1NOVR3OUhxcVFLRzY2QkVFQ3NMa1UxMzVveVdkaTJxUkVvYz1zOTYtYyIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJzb3VyY2Vfc2lnbl9pbl9wcm92aWRlciI6Imdvb2dsZS5jb20iLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vZ3B0LWVuZ2luZWVyLTM5MDYwNyIsImF1ZCI6ImdwdC1lbmdpbmVlci0zOTA2MDciLCJhdXRoX3RpbWUiOjE3NTEyNjYyNDUsInVzZXJfaWQiOiJPZG51NFg1R1h6VkhpemloZTV1clNROWhBTnMxIiwic3ViIjoiT2RudTRYNUdYelZIaXppaGU1dXJTUTloQU5zMSIsImlhdCI6MTc1MTM5OTM3MiwiZXhwIjoxNzUxNDAyOTcyLCJlbWFpbCI6Im9mZmljZUBuZXJpeWFidWRyYWhhbS5jby5pbCIsImZpcmViYXNlIjp7ImlkZW50aXRpZXMiOnsiZ29vZ2xlLmNvbSI6WyIxMDY0NzQzODA1MDU0OTk4MjIzMTYiXSwiZW1haWwiOlsib2ZmaWNlQG5lcml5YWJ1ZHJhaGFtLmNvLmlsIl19LCJzaWduX2luX3Byb3ZpZGVyIjoiY3VzdG9tIn19.2VlRA_xujWeYCpLM_agOypp1IuurhX-8FWBAmdjXZDn8rW4c114G-Ghxx5B6TzpE3d5lyTZKXGTYQx6A_hDtF6Q7zwItqAuDfkn8C6Ci1u5HHBROEnt9Yuy39cyuB1Mi_GgNHAgJCMSOTLoDC1nBGTuPW_zU5O2UGjhobqED_zFMCxlMi6Pdm04DCaKtTuvHhmzfq5BG46ZzMoCBe69RuLFuPYmi5nWiWqhSXcjmxaGX2CG2ZwEMiuPXiAq0gYXblRUa5I95InmEHO-ksR9JKJ2GbSeDsUGtZKWMDxKYkpdLtncdpWsd_GeLYQIQWYkGPpdxqEV-5PVFuO5Tvb8p-Q";
-
 export const CustomDomainManager = () => {
   const [subdomain, setSubdomain] = useState("");
   const [domain, setDomain] = useState("");
@@ -93,106 +89,6 @@ export const CustomDomainManager = () => {
     return '';
   };
 
-  const getAuthToken = async () => {
-    try {
-      console.log('Fetching fresh auth token from your proxy server...');
-  
-      const response = await fetch("http://161.97.68.203:3100/get-lovable-token", {
-        method: 'GET'
-      });
-  
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Failed to get auth token via proxy:', response.status, errorText);
-        throw new Error(`Failed to get auth token: ${response.status}`);
-      }
-  
-      const result = await response.json();
-      console.log('Got fresh auth token:', result);
-  
-      return result.token;
-    } catch (error) {
-      console.error('Error getting auth token via proxy:', error);
-      throw error;
-    }
-  };
-
-  const addDomainToLovableAPI = async (domainToAdd: string) => {
-    try {
-      console.log('Adding domain to Lovable API:', domainToAdd);
-      
-      // Get fresh auth token first
-      const authToken = await getAuthToken();
-      
-      const response = await fetch(LOVABLE_API_BASE_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-          'Origin': 'https://lovable.dev',
-          'Referer': 'https://lovable.dev/'
-        },
-        body: JSON.stringify({
-          domain: domainToAdd
-        })
-      });
-  
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Failed to add domain to Lovable API:', response.status, errorText);
-        throw new Error(`Failed to add domain: ${response.status}`);
-      }
-  
-      const result = await response.json();
-      console.log('Domain added to Lovable API successfully:', result);
-      return result;
-    } catch (error) {
-      console.error('Error adding domain to Lovable API:', error);
-      throw error;
-    }
-  };
-  
-  const checkDomainInLovableAPI = async (domainToCheck: string) => {
-    try {
-      console.log('Checking domain in Lovable API:', domainToCheck);
-      
-      // Get fresh auth token first
-      const authToken = await getAuthToken();
-      
-      const response = await fetch(LOVABLE_API_BASE_URL, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-          'Origin': 'https://lovable.dev',
-          'Referer': 'https://lovable.dev/'
-        }
-      });
-  
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Failed to check domains in Lovable API:', response.status, errorText);
-        throw new Error(`Failed to check domains: ${response.status}`);
-      }
-  
-      const domains = await response.json();
-      console.log('Domains from Lovable API:', domains);
-  
-      // Check if the domain exists and is active
-      const domainEntry = domains.find((d: any) => d.domain === domainToCheck);
-      if (domainEntry && domainEntry.status === 'active') {
-        console.log('Domain is verified and active:', domainEntry);
-        return true;
-      } else {
-        console.log('Domain not found or not active:', domainEntry);
-        return false;
-      }
-    } catch (error) {
-      console.error('Error checking domain in Lovable API:', error);
-      throw error;
-    }
-  };
-
   const handleSaveDomain = async () => {
     if (!user || !session) {
       toast({
@@ -229,12 +125,6 @@ export const CustomDomainManager = () => {
     try {
       console.log('Saving domain for user:', user.id, 'Domain:', fullDomain);
       
-      // First, add the domain to Lovable API
-      await addDomainToLovableAPI(fullDomain);
-      
-      // Then check if it's verified
-      const isVerified = await checkDomainInLovableAPI(fullDomain);
-      
       // Use upsert to either insert or update the profile record
       const { error } = await supabase
         .from('profiles')
@@ -242,7 +132,7 @@ export const CustomDomainManager = () => {
           id: user.id,
           email: user.email,
           custom_domain: fullDomain,
-          domain_verified: isVerified,
+          domain_verified: false,
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'id'
@@ -254,13 +144,11 @@ export const CustomDomainManager = () => {
       }
 
       setCurrentDomain(fullDomain);
-      setIsDomainVerified(isVerified);
+      setIsDomainVerified(false);
 
       toast({
         title: "נשמר בהצלחה!",
-        description: isVerified 
-          ? "הדומיין המותאם אישית נשמר ומאומת! הוא מוכן לשימוש."
-          : "הדומיין המותאם אישית נשמר. יש להגדיר את רשומת ה-DNS כדי להשלים את ההגדרה",
+        description: "הדומיין המותאם אישית נשמר. יש להגדיר את רשומת ה-DNS כדי להשלים את ההגדרה",
       });
     } catch (error: any) {
       console.error('Error saving domain:', error);
@@ -297,33 +185,35 @@ export const CustomDomainManager = () => {
     setIsCheckingDomain(true);
     
     try {
-      // Check domain status via Lovable API
-      const isVerified = await checkDomainInLovableAPI(fullDomain);
-      
-      // Update the database with the verification status
-      const { error } = await supabase
+      // For now, we'll just refresh the domain status from the database
+      // In a real implementation, you'd check DNS records here
+      const { data: profile, error } = await supabase
         .from('profiles')
-        .update({
-          domain_verified: isVerified,
-          updated_at: new Date().toISOString()
-        })
+        .select('domain_verified')
         .eq('id', user.id)
-        .eq('custom_domain', fullDomain);
+        .eq('custom_domain', fullDomain)
+        .maybeSingle();
 
       if (error) {
-        console.error('Error updating domain verification status:', error);
         throw error;
       }
 
-      setIsDomainVerified(isVerified);
-      
-      toast({
-        title: isVerified ? "דומיין מאומת!" : "דומיין לא מאומת",
-        description: isVerified 
-          ? "הדומיין שלך מוגדר בהצלחה ופועל" 
-          : "הדומיין עדיין לא מאומת. אנא וודא שהגדרת את רשומת ה-DNS",
-        variant: isVerified ? "default" : "destructive"
-      });
+      if (profile) {
+        setIsDomainVerified(profile.domain_verified || false);
+        toast({
+          title: profile.domain_verified ? "דומיין מאומת!" : "דומיין לא מאומת",
+          description: profile.domain_verified 
+            ? "הדומיין שלך מוגדר בהצלחה ופועל" 
+            : "הדומיין עדיין לא מאומת. אנא וודא שהגדרת את רשומת ה-DNS",
+          variant: profile.domain_verified ? "default" : "destructive"
+        });
+      } else {
+        toast({
+          title: "הדומיין לא נמצא",
+          description: "יש לשמור את הדומיין לפני בדיקתו",
+          variant: "destructive"
+        });
+      }
     } catch (error: any) {
       console.error('Error checking domain:', error);
       toast({
@@ -520,7 +410,7 @@ export const CustomDomainManager = () => {
                 disabled={isLoading || !fullDomain}
                 className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
               >
-                {isLoading ? "שומר ובודק..." : "שמור דומיין"}
+                {isLoading ? "שומר..." : "שמור דומיין"}
               </Button>
               
               {currentDomain && (
@@ -604,18 +494,6 @@ export const CustomDomainManager = () => {
                 <p className="text-sm text-orange-300 mt-2">
                   לאחר הגדרת רשומת ה-DNS, הדפים שלך יהיו זמינים בדומיין החדש תוך מספר שעות.
                   ניתן ללחוץ על "בדוק דומיין" כדי לבדוק את הסטטוס.
-                </p>
-              </div>
-            )}
-
-            {isDomainVerified && (
-              <div className="bg-green-900/20 border border-green-700/50 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-green-400">
-                  <CheckCircle className="w-5 h-5" />
-                  <span className="font-semibold">הדומיין מאומת ופעיל!</span>
-                </div>
-                <p className="text-sm text-green-300 mt-2">
-                  הדומיין שלך מוגדר בהצלחה. כל הדפים שתפרסם יהיו זמינים בדומיין המותאם שלך.
                 </p>
               </div>
             )}
