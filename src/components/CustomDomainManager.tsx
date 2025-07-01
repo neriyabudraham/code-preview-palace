@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, Globe, Copy, ExternalLink } from "lucide-react";
+import { AlertCircle, CheckCircle, Globe, Copy, ExternalLink, Unlink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,6 +13,7 @@ export const CustomDomainManager = () => {
   const [customDomain, setCustomDomain] = useState("");
   const [currentDomain, setCurrentDomain] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isDomainVerified, setIsDomainVerified] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -105,6 +106,44 @@ export const CustomDomainManager = () => {
     }
   };
 
+  const handleDisconnectDomain = async () => {
+    if (!user) return;
+
+    setIsDisconnecting(true);
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          custom_domain: null,
+          domain_verified: false
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        throw error;
+      }
+
+      setCurrentDomain(null);
+      setIsDomainVerified(false);
+      setCustomDomain("");
+
+      toast({
+        title: "דומיין נותק בהצלחה",
+        description: "הדומיין המותאם אישית הוסר. הדפים יפורסמו תחת הדומיין הברירת מחדל",
+      });
+    } catch (error) {
+      console.error('Error disconnecting domain:', error);
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בניתוק הדומיין",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
   const copyDNSRecord = () => {
     navigator.clipboard.writeText("185.158.133.1");
     toast({
@@ -132,22 +171,34 @@ export const CustomDomainManager = () => {
                   <p className="text-sm text-slate-400">הדומיין הנוכחי:</p>
                   <p className="text-lg font-semibold text-white">{currentDomain}</p>
                 </div>
-                <Badge 
-                  variant={isDomainVerified ? "default" : "destructive"}
-                  className={isDomainVerified ? "bg-green-600" : "bg-orange-600"}
-                >
-                  {isDomainVerified ? (
-                    <>
-                      <CheckCircle className="w-4 h-4 mr-1" />
-                      מאומת
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      לא מאומת
-                    </>
-                  )}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge 
+                    variant={isDomainVerified ? "default" : "destructive"}
+                    className={isDomainVerified ? "bg-green-600" : "bg-orange-600"}
+                  >
+                    {isDomainVerified ? (
+                      <>
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        מאומת
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="w-4 h-4 mr-1" />
+                        לא מאומת
+                      </>
+                    )}
+                  </Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleDisconnectDomain}
+                    disabled={isDisconnecting}
+                    className="border-red-600 text-red-400 hover:bg-red-900/20"
+                  >
+                    <Unlink className="w-4 h-4 mr-1" />
+                    {isDisconnecting ? "מנתק..." : "נתק"}
+                  </Button>
+                </div>
               </div>
             </div>
           )}

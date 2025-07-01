@@ -75,18 +75,19 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
 
   const checkSlugAvailability = async (slug: string) => {
     try {
-      // Check if the slug is available or only occupied by inactive pages
+      // Check if the slug is available for the current user
       const { data: existingPages, error } = await supabase
         .from('published_pages')
-        .select('id, project_id, html_content')
-        .eq('slug', slug);
+        .select('id, project_id, user_id')
+        .eq('slug', slug)
+        .eq('user_id', user?.id);
 
       if (error) {
         console.error('Error checking slug availability:', error);
         return { available: false, error: 'שגיאה בבדיקת זמינות הסיומת' };
       }
 
-      // If no pages found, slug is available
+      // If no pages found for this user with this slug, it's available
       if (!existingPages || existingPages.length === 0) {
         return { available: true };
       }
@@ -95,14 +96,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
       const conflictingPages = existingPages.filter(page => page.project_id !== project.id);
       
       if (conflictingPages.length > 0) {
-        // Check if the conflicting pages are active (have valid HTML content)
-        const activeConflictingPages = conflictingPages.filter(page => 
-          page.html_content && page.html_content.trim().length > 0
-        );
-
-        if (activeConflictingPages.length > 0) {
-          return { available: false, error: 'הסיומת תפוסה על ידי דף פעיל אחר' };
-        }
+        return { available: false, error: 'הסיומת כבר בשימוש על ידי פרויקט אחר שלך' };
       }
 
       return { available: true };
@@ -143,7 +137,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
         .update(publishedPageData)
         .eq('project_id', project.id)
         .eq('slug', slug)
-        .eq('user_id', user.id) // Ensure user can only update their own pages
+        .eq('user_id', user.id)
         .select()
         .single();
 
@@ -231,7 +225,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
       if (!available) {
         toast({
           title: "הסיומת לא זמינה",
-          description: availabilityError || "הסיומת כבר בשימוש על ידי דף פעיל אחר",
+          description: availabilityError || "הסיומת כבר בשימוש",
           variant: "destructive"
         });
         setIsPublishing(false);
@@ -242,19 +236,12 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
       const titleMatch = project.html.match(/<title[^>]*>([^<]+)<\/title>/i);
       const title = titleMatch ? titleMatch[1] : project.name;
 
-      // Delete any existing inactive pages with this slug from other projects
-      await supabase
-        .from('published_pages')
-        .delete()
-        .eq('slug', slug)
-        .neq('project_id', project.id);
-
       const publishedPageData = {
         slug,
         title,
         html_content: project.html,
         project_id: project.id,
-        user_id: user.id, // Associate the page with the current user
+        user_id: user.id,
         // Add custom domain if user has one
         custom_domain: userDomain
       };
@@ -297,7 +284,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
       // Generate the URL - use custom domain if available, otherwise use default
       const url = userDomain 
         ? `https://${userDomain}/${slug}` 
-        : `https://page.neriyabudraham.co.il/${slug}`;
+        : `https://code-preview-palace.lovable.app/${slug}`;
       setPublishedUrl(url);
       
       // Update project in localStorage
@@ -434,12 +421,12 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
                   </label>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-600 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-lg border">
-                      https://{userDomain || 'page.neriyabudraham.co.il'}/
+                      https://{userDomain || 'code-preview-palace.lovable.app'}/
                     </span>
                     <Input 
                       value={customSlug} 
                       onChange={(e) => setCustomSlug(e.target.value)}
-                      placeholder={isUpdatingExisting ? "הסיומת הנוכחית" : "grid"}
+                      placeholder={isUpdatingExisting ? "הסיומת הנוכחית" : "my-page"}
                       className="flex-1 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white font-mono"
                     />
                   </div>

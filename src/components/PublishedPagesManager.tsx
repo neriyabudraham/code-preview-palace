@@ -16,6 +16,7 @@ interface PublishedPage {
   project_id: string;
   created_at: string;
   updated_at: string;
+  custom_domain?: string;
 }
 
 export const PublishedPagesManager = () => {
@@ -42,10 +43,10 @@ export const PublishedPagesManager = () => {
     }
 
     try {
-      // Only fetch pages that belong to the current user
+      // Fetch pages that belong to the current user
       const { data, error } = await supabase
         .from('published_pages')
-        .select('id, slug, title, project_id, created_at, updated_at')
+        .select('id, slug, title, project_id, created_at, updated_at, custom_domain')
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
 
@@ -76,7 +77,8 @@ export const PublishedPagesManager = () => {
       const { error } = await supabase
         .from('published_pages')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user?.id); // Double check ownership
 
       if (error) {
         console.error('Supabase deletion error:', error);
@@ -142,6 +144,13 @@ export const PublishedPagesManager = () => {
     });
   };
 
+  const getPublishedUrl = (page: PublishedPage) => {
+    if (page.custom_domain) {
+      return `https://${page.custom_domain}/${page.slug}`;
+    }
+    return `https://code-preview-palace.lovable.app/${page.slug}`;
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -193,6 +202,11 @@ export const PublishedPagesManager = () => {
                 <div className="flex items-center gap-2 text-sm">
                   <Globe size={14} className="text-emerald-400" />
                   <span className="text-emerald-400 font-mono">/{page.slug}</span>
+                  {page.custom_domain && (
+                    <Badge variant="outline" className="text-xs border-blue-400 text-blue-400">
+                      דומיין מותאם
+                    </Badge>
+                  )}
                 </div>
               </div>
               
@@ -212,7 +226,7 @@ export const PublishedPagesManager = () => {
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  onClick={() => window.open(`/${page.slug}`, '_blank')}
+                  onClick={() => window.open(getPublishedUrl(page), '_blank')}
                   className="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg transition-all duration-200 font-semibold"
                 >
                   <ExternalLink size={14} className="mr-1" />
