@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -7,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { HtmlPreview } from "./HtmlPreview";
 import { VersionPreview } from "./VersionPreview";
-import { Edit, Trash2, Eye, Download, Search, Copy, Clock } from "lucide-react";
+import { PublishDialog } from "./PublishDialog";
+import { Edit, Trash2, Eye, Download, Search, Copy, Clock, Globe, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ProjectVersion {
@@ -36,6 +36,8 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
   const [selectedVersion, setSelectedVersion] = useState<ProjectVersion | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showVersionPreview, setShowVersionPreview] = useState(false);
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const [publishingProject, setPublishingProject] = useState<Project | null>(null);
   const { toast } = useToast();
 
   const loadProjects = () => {
@@ -110,6 +112,11 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
     });
   };
 
+  const handlePublish = (project: Project) => {
+    setPublishingProject(project);
+    setShowPublishDialog(true);
+  };
+
   const previewVersion = (project: Project, version: ProjectVersion) => {
     setSelectedProject(project);
     setSelectedVersion(version);
@@ -179,25 +186,25 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <div className="relative flex-1">
-          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
           <Input
             placeholder="חפש פרויקטים..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pr-10 bg-gray-800 border-gray-700 text-white focus:ring-2 focus:ring-blue-500 transition-all"
+            className="pr-10 bg-slate-800/70 border-slate-700 text-white focus:ring-2 focus:ring-violet-500 transition-all h-12"
           />
         </div>
-        <Badge variant="secondary" className="bg-gray-700 text-gray-300 px-4 py-2 text-sm">
+        <Badge variant="secondary" className="bg-slate-700/50 text-slate-300 px-4 py-2 text-sm border border-slate-600">
           {filteredProjects.length} פרויקטים
         </Badge>
       </div>
 
       {filteredProjects.length === 0 ? (
-        <Card className="p-8 bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 text-center shadow-xl">
-          <p className="text-gray-400 text-lg mb-2">
+        <Card className="p-8 bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800 border-slate-700 text-center shadow-xl">
+          <p className="text-slate-400 text-lg mb-2">
             {searchTerm ? "לא נמצאו פרויקטים התואמים לחיפוש" : "אין פרויקטים שמורים"}
           </p>
-          <p className="text-gray-500 text-sm">
+          <p className="text-slate-500 text-sm">
             {!searchTerm && "התחל לערוך דפים חדשים ושמור אותם כדי לראות אותם כאן"}
           </p>
         </Card>
@@ -205,25 +212,40 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => {
             const { title } = getPreviewText(project.html);
+            const isPublished = !!(project as any).publishedUrl;
             
             return (
-              <Card key={project.id} className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 hover:shadow-2xl transition-all duration-300 transform hover:scale-105 overflow-hidden">
-                <div className="aspect-video bg-white border-b border-gray-700">
+              <Card key={project.id} className="bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800 border-slate-700 hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] overflow-hidden">
+                <div className="aspect-video bg-white border-b border-slate-700 relative">
                   <HtmlPreview html={project.html} />
+                  {isPublished && (
+                    <div className="absolute top-2 right-2">
+                      <Badge className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white border-0 shadow-lg">
+                        <Globe size={12} className="mr-1" />
+                        מפורסם
+                      </Badge>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="p-5 space-y-4">
                   <div>
                     <h3 className="font-bold text-white text-lg mb-1 truncate">{project.name}</h3>
                     {title && title !== project.name && (
-                      <p className="text-sm text-blue-400 truncate">"{title}"</p>
+                      <p className="text-sm text-violet-400 truncate">"{title}"</p>
                     )}
                   </div>
                   
-                  <div className="text-xs text-gray-500 space-y-1">
+                  <div className="text-xs text-slate-500 space-y-1">
                     <p>נוצר: {formatDate(project.createdAt)}</p>
                     {project.updatedAt !== project.createdAt && (
                       <p>עודכן: {formatDate(project.updatedAt)}</p>
+                    )}
+                    {isPublished && (
+                      <p className="flex items-center gap-1 text-emerald-400">
+                        <Globe size={12} />
+                        פורסם: {formatDate((project as any).publishedAt)}
+                      </p>
                     )}
                     {project.versions && project.versions.length > 0 && (
                       <p className="flex items-center gap-1 text-blue-400">
@@ -238,7 +260,7 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
                       <Button
                         size="sm"
                         onClick={() => editProject(project)}
-                        className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all duration-200 transform hover:scale-105"
+                        className="flex-1 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white shadow-lg transition-all duration-200 transform hover:scale-105 font-semibold"
                       >
                         <Edit size={14} className="mr-1" />
                         ערוך
@@ -248,35 +270,46 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
                         size="sm"
                         variant="outline"
                         onClick={() => duplicateProject(project)}
-                        className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white transition-all duration-200 shadow-md"
+                        className="flex-1 border-slate-600 bg-slate-700/50 text-slate-300 hover:bg-slate-600 hover:text-white transition-all duration-200 shadow-md font-medium"
                       >
                         <Copy size={14} className="mr-1" />
                         שכפל
                       </Button>
                     </div>
                     
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => downloadProject(project)}
-                      className="w-full border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white transition-all duration-200 shadow-md"
-                    >
-                      <Download size={14} className="mr-1" />
-                      הורד HTML
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => handlePublish(project)}
+                        className="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg transition-all duration-200 font-semibold"
+                      >
+                        <Share2 size={14} className="mr-1" />
+                        {isPublished ? "עדכן פרסום" : "פרסם"}
+                      </Button>
+                      
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => downloadProject(project)}
+                        className="flex-1 border-slate-600 bg-slate-700/50 text-slate-300 hover:bg-slate-600 hover:text-white transition-all duration-200 shadow-md font-medium"
+                      >
+                        <Download size={14} className="mr-1" />
+                        הורד
+                      </Button>
+                    </div>
                     
                     {project.versions && project.versions.length > 0 && (
                       <details className="w-full">
-                        <summary className="cursor-pointer text-xs text-gray-400 hover:text-gray-300 list-none p-2 bg-gray-700/30 rounded-md">
-                          <span className="flex items-center gap-1 justify-center">
+                        <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-300 list-none p-3 bg-slate-700/30 rounded-lg border border-slate-600/50">
+                          <span className="flex items-center gap-2 justify-center font-medium">
                             <Clock size={12} />
                             גירסאות קודמות ({project.versions.length})
                           </span>
                         </summary>
-                        <div className="mt-2 space-y-2 max-h-32 overflow-y-auto">
+                        <div className="mt-3 space-y-2 max-h-32 overflow-y-auto">
                           {project.versions.slice(0, 5).map((version) => (
-                            <div key={version.id} className="flex items-center justify-between text-xs bg-gray-700/20 p-2 rounded">
-                              <span className="text-gray-400 truncate">
+                            <div key={version.id} className="flex items-center justify-between text-xs bg-slate-700/20 p-3 rounded border border-slate-600/30">
+                              <span className="text-slate-400 truncate">
                                 גירסה {version.version} - {formatDate(version.savedAt)}
                               </span>
                               <div className="flex gap-1">
@@ -284,7 +317,7 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
                                   size="sm"
                                   variant="ghost"
                                   onClick={() => previewVersion(project, version)}
-                                  className="h-6 px-2 text-xs text-gray-400 hover:text-white hover:bg-gray-600"
+                                  className="h-6 px-2 text-xs text-slate-400 hover:text-white hover:bg-slate-600"
                                 >
                                   <Eye size={12} />
                                 </Button>
@@ -292,7 +325,7 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
                                   size="sm"
                                   variant="ghost"
                                   onClick={() => restoreVersion(project, version)}
-                                  className="h-6 px-2 text-xs text-gray-400 hover:text-white hover:bg-gray-600"
+                                  className="h-6 px-2 text-xs text-slate-400 hover:text-white hover:bg-slate-600"
                                 >
                                   שחזר
                                 </Button>
@@ -305,20 +338,20 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
                     
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="destructive" className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-lg transition-all duration-200">
+                        <Button size="sm" variant="destructive" className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-lg transition-all duration-200 font-semibold">
                           <Trash2 size={14} className="mr-1" />
                           מחק פרויקט
                         </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent className="bg-gray-800 border-gray-700">
+                      <AlertDialogContent className="bg-slate-800 border-slate-700">
                         <AlertDialogHeader>
                           <AlertDialogTitle className="text-white">מחיקת פרויקט</AlertDialogTitle>
-                          <AlertDialogDescription className="text-gray-400">
+                          <AlertDialogDescription className="text-slate-400">
                             האם אתה בטוח שברצונך למחוק את "{project.name}"? פעולה זו לא ניתנת לביטול.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
+                          <AlertDialogCancel className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600">
                             ביטול
                           </AlertDialogCancel>
                           <AlertDialogAction
@@ -344,6 +377,14 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
         version={selectedVersion}
         onRestore={handleVersionRestore}
       />
+
+      {publishingProject && (
+        <PublishDialog 
+          open={showPublishDialog}
+          onOpenChange={setShowPublishDialog}
+          project={publishingProject}
+        />
+      )}
     </div>
   );
 };

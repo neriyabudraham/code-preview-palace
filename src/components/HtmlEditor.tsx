@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { CodeEditor } from "./CodeEditor";
 import { HtmlPreview } from "./HtmlPreview";
 import { PublishDialog } from "./PublishDialog";
-import { Save, Play, RotateCcw, Copy, Share2 } from "lucide-react";
+import { Save, Play, RotateCcw, Copy, Share2, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const EMPTY_HTML = `<!DOCTYPE html>
@@ -415,50 +414,53 @@ export const HtmlEditor = () => {
 
   return (
     <div className="space-y-6">
-      <Card className="p-6 bg-gradient-to-r from-gray-800 to-gray-900 border-gray-700 shadow-xl">
+      <Card className="p-6 bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800 border-slate-700 shadow-2xl">
         <div className="flex items-center gap-4 mb-6">
-          <Input
-            value={fileName}
-            onChange={(e) => handleFileNameChange(e.target.value)}
-            placeholder="שם הקובץ..."
-            className="flex-1 bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 transition-all"
-            disabled={isSampleMode}
-          />
+          <div className="relative flex-1">
+            <FileText className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+            <Input
+              value={fileName}
+              onChange={(e) => handleFileNameChange(e.target.value)}
+              placeholder="שם הקובץ..."
+              className="pr-12 bg-slate-800/70 border-slate-600 text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 h-12 text-lg"
+              disabled={isSampleMode}
+            />
+          </div>
           <div className="flex gap-3">
             <Button 
               onClick={handleNewPage} 
               variant="outline" 
-              className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white transition-all duration-200 shadow-md"
+              className="border-slate-600 bg-slate-800/50 text-slate-300 hover:bg-slate-700 hover:text-white hover:border-slate-500 transition-all duration-200 h-12 px-6 font-medium"
             >
               דף חדש
             </Button>
             <Button 
               onClick={handleDuplicate} 
               variant="outline" 
-              className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white transition-all duration-200 shadow-md"
+              className="border-slate-600 bg-slate-800/50 text-slate-300 hover:bg-slate-700 hover:text-white hover:border-slate-500 transition-all duration-200 h-12 px-4"
             >
-              <Copy size={16} className="mr-2" />
+              <Copy size={18} className="mr-2" />
               שכפל
             </Button>
           </div>
         </div>
         
-        <div className="flex gap-3 mb-4">
+        <div className="flex gap-4 mb-6">
           <Button 
             onClick={handleSave} 
-            className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg transition-all duration-200 transform hover:scale-105" 
+            className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 border-0 text-white shadow-lg hover:shadow-xl transition-all duration-200 h-12 px-8 font-semibold text-base" 
             disabled={isSampleMode || isAutoSaving}
           >
-            <Save size={16} className="mr-2" />
+            <Save size={18} className="mr-2" />
             {isAutoSaving ? "שומר..." : "שמור"}
           </Button>
           
           {lastSavedProject && (
             <Button 
               onClick={handlePublish} 
-              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all duration-200 transform hover:scale-105"
+              className="bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 border-0 text-white shadow-lg hover:shadow-xl transition-all duration-200 h-12 px-8 font-semibold text-base"
             >
-              <Share2 size={16} className="mr-2" />
+              <Share2 size={18} className="mr-2" />
               פרסום
             </Button>
           )}
@@ -466,48 +468,59 @@ export const HtmlEditor = () => {
           <Button 
             onClick={handleReset} 
             variant="outline" 
-            className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white transition-all duration-200 shadow-md"
+            className="border-slate-600 bg-slate-800/50 text-slate-300 hover:bg-red-600 hover:text-white hover:border-red-500 transition-all duration-200 h-12 px-6 font-medium"
           >
-            <RotateCcw size={16} className="mr-2" />
+            <RotateCcw size={18} className="mr-2" />
             איפוס
           </Button>
         </div>
         
         <div className="flex gap-2">
           {isSampleMode && (
-            <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-3 text-blue-200 text-sm flex-1">
-              זהו דף לדוגמא - התחל להקליד כדי לערוך קוד חדש
+            <div className="bg-blue-900/40 border border-blue-700/50 rounded-xl p-4 text-blue-200 text-sm flex-1 backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                זהו דף לדוגמא - התחל להקליד כדי לערוך קוד חדש
+              </div>
             </div>
           )}
           {!isSampleMode && (
-            <div className="bg-green-900/30 border border-green-700 rounded-lg p-3 text-green-200 text-sm flex-1">
-              🔄 שמירה אוטומטית פעילה - השינויים נשמרים אוטומטיים
+            <div className="bg-emerald-900/40 border border-emerald-700/50 rounded-xl p-4 text-emerald-200 text-sm flex-1 backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                🔄 שמירה אוטומטית פעילה - השינויים נשמרים אוטומטיים
+              </div>
             </div>
           )}
           {isAutoSaving && (
-            <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-3 text-yellow-200 text-sm">
-              💾 שומר...
+            <div className="bg-amber-900/40 border border-amber-700/50 rounded-xl p-4 text-amber-200 text-sm backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce"></div>
+                💾 שומר...
+              </div>
             </div>
           )}
         </div>
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-350px)]">
-        <Card className="p-4 bg-gray-800 border-gray-700 shadow-xl">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            <span className="text-sm text-gray-400 mr-3">עורך הקוד</span>
-            {isSampleMode && <span className="text-xs text-blue-400">(דוגמא)</span>}
+        <Card className="p-4 bg-slate-900/80 border-slate-700 shadow-xl backdrop-blur-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex gap-2">
+              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+              <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+            </div>
+            <span className="text-sm text-slate-400 font-medium">עורך הקוד</span>
+            {isSampleMode && <span className="text-xs text-blue-400 bg-blue-900/30 px-2 py-1 rounded-full">(דוגמא)</span>}
           </div>
           <CodeEditor value={htmlCode} onChange={handleCodeChange} />
         </Card>
 
-        <Card className="p-4 bg-gray-800 border-gray-700 shadow-xl">
-          <div className="flex items-center gap-2 mb-3">
-            <Play size={16} className="text-green-400" />
-            <span className="text-sm text-gray-400">תצוגה מקדימה</span>
+        <Card className="p-4 bg-slate-900/80 border-slate-700 shadow-xl backdrop-blur-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <Play size={16} className="text-emerald-400" />
+            <span className="text-sm text-slate-400 font-medium">תצוגה מקדימה</span>
           </div>
           <HtmlPreview html={htmlCode} />
         </Card>
