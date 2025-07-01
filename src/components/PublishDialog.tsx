@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Copy, ExternalLink, Share2, Globe, CheckCircle, Link, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PublishDialogProps {
   open: boolean;
@@ -17,7 +18,23 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
   const [customSlug, setCustomSlug] = useState("");
   const [isPublishing, setIsPublishing] = useState(false);
   const [isUpdatingExisting, setIsUpdatingExisting] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { toast } = useToast();
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      setIsCheckingAuth(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsAuthenticated(!!user);
+      setIsCheckingAuth(false);
+    };
+    
+    if (open) {
+      checkAuth();
+    }
+  }, [open]);
 
   // Initialize the dialog state when it opens
   useEffect(() => {
@@ -40,6 +57,15 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
   }, [open, project]);
 
   const handlePublish = async () => {
+    if (!isAuthenticated) {
+      toast({
+        title: "דרושה הרשמה",
+        description: "יש להתחבר כדי לפרסם דפים",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!customSlug.trim()) {
       toast({
         title: "שגיאה",
@@ -62,19 +88,75 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
 
     setIsPublishing(true);
     
-    // Simulate publishing process
-    setTimeout(() => {
-      // Generate the custom URL with the user's domain
-      const url = `https://page.neriyabudraham.co.il/${customSlug.trim()}`;
-      setPublishedUrl(url);
-      setIsPublishing(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+
+      const slug = customSlug.trim();
       
-      // Mark project as published in localStorage
+      // Check if slug already exists (for different projects)
+      const { data: existingPage } = await supabase
+        .from('published_pages')
+        .select('id, project_id')
+        .eq('slug', slug)
+        .single();
+
+      if (existingPage && existingPage.project_id !== project.id) {
+        toast({
+          title: "הסיומת תפוסה",
+          description: "הסיומת הזו כבר בשימוש. אנא בחר סיומת אחרת.",
+          variant: "destructive"
+        });
+        setIsPublishing(false);
+        return;
+      }
+
+      // Get project title from HTML
+      const titleMatch = project.html.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const title = titleMatch ? titleMatch[1] : project.name;
+
+      const publishedPageData = {
+        slug,
+        title,
+        html_content: project.html,
+        project_id: project.id,
+        user_id: user.id
+      };
+
+      let result;
+      if (isUpdatingExisting && existingPage) {
+        // Update existing published page
+        result = await supabase
+          .from('published_pages')
+          .update(publishedPageData)
+          .eq('id', existingPage.id)
+          .select()
+          .single();
+      } else {
+        // Create new published page
+        result = await supabase
+          .from('published_pages')
+          .insert(publishedPageData)
+          .select()
+          .single();
+      }
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      // Generate the custom URL
+      const url = `https://page.neriyabudraham.co.il/${slug}`;
+      setPublishedUrl(url);
+      
+      // Update project in localStorage
       const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
       const projectIndex = savedProjects.findIndex((p: any) => p.id === project.id);
       if (projectIndex !== -1) {
         savedProjects[projectIndex].publishedUrl = url;
-        savedProjects[projectIndex].customSlug = customSlug.trim();
+        savedProjects[projectIndex].customSlug = slug;
         savedProjects[projectIndex].publishedAt = new Date().toISOString();
         localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
       }
@@ -82,11 +164,20 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
       const actionText = isUpdatingExisting ? "עודכן" : "פורסם";
       toast({
         title: `${actionText} בהצלחה! 🎉`,
-        description: `הפרויקט "${project.name}" ${isUpdatingExisting ? 'עודכן' : 'זמין'} בכתובת המותאמת אישית`,
+        description: `הפרויקט "${project.name}" ${isUpdatingExisting ? 'עודכן' : 'פורסם'} בהצלחה`,
       });
       
       setIsUpdatingExisting(true);
-    }, 2000);
+    } catch (error) {
+      console.error("Publishing error:", error);
+      toast({
+        title: "שגיאה בפרסום",
+        description: "אירעה שגיאה בעת פרסום הדף. אנא נסה שנית.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const copyLink = () => {
@@ -118,6 +209,83 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
     setIsUpdatingExisting(false);
   };
 
+  const handleSignIn = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      
+      if (error) {
+        toast({
+          title: "שגיאה בהתחברות",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Sign in error:", error);
+      toast({
+        title: "שגיאה בהתחברות",
+        description: "אירעה שגיאה בעת ההתחברות. אנא נסה שנית.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  if (isCheckingAuth) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white max-w-lg shadow-2xl">
+          <div className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600 dark:text-gray-400">בודק מצב התחברות...</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white max-w-lg shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-3xl font-bold text-center bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              דרושה הרשמה
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            <div className="text-center py-6">
+              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Globe size={32} className="text-white" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                כדי לפרסם דפים אתה צריך להתחבר
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 text-sm max-w-sm mx-auto">
+                ההתחברות נדרשת כדי לשמור ולנהל את הדפים המפורסמים שלך
+              </p>
+            </div>
+
+            <Button 
+              onClick={handleSignIn}
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all duration-300 transform hover:scale-105 px-8 py-4 text-lg font-bold rounded-xl h-14"
+            >
+              <Globe size={24} className="mr-3" />
+              התחבר עם Google
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white max-w-lg shadow-2xl">
@@ -143,21 +311,6 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
                     ✅ כבר מפורסם
                   </p>
                 )}
-              </div>
-            </div>
-          </div>
-
-          {/* Important Notice */}
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle size={20} className="text-amber-600 dark:text-amber-400 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-semibold text-amber-800 dark:text-amber-300 mb-1">
-                  הערה חשובה
-                </p>
-                <p className="text-amber-700 dark:text-amber-400">
-                  הפרסום כרגע הוא לדמו בלבד. לפרסום אמיתי יש צורך בהגדרת שרת שיטפל בסיומות המותאמות אישית.
-                </p>
               </div>
             </div>
           </div>
