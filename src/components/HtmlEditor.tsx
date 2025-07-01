@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,6 +75,7 @@ export const HtmlEditor = () => {
         userId: user?.id
       };
       localStorage.setItem(getUserTempWorkKey(), JSON.stringify(tempWork));
+      console.log('Saved temp work:', tempWork);
     }
   }, [fileName, htmlCode, getUserTempWorkKey, user]);
 
@@ -223,7 +223,7 @@ export const HtmlEditor = () => {
         setLastSavedProject(currentProject);
       }
       
-      console.log("Auto-saved successfully");
+      console.log("Auto-saved successfully to:", getUserProjectsKey());
     } catch (error) {
       console.error("Auto-save failed:", error);
     } finally {
@@ -267,7 +267,7 @@ export const HtmlEditor = () => {
       try {
         const project = JSON.parse(editingProject);
         // Verify the project belongs to the current user
-        if (!user || project.userId === user.id) {
+        if (!user || !project.userId || project.userId === user.id) {
           setHtmlCode(project.html);
           setFileName(project.name);
           setCurrentProjectId(project.id);
@@ -296,7 +296,7 @@ export const HtmlEditor = () => {
       try {
         const temp = JSON.parse(tempWork);
         // Verify the temp work belongs to the current user
-        if (!user || temp.userId === user.id) {
+        if (!user || !temp.userId || temp.userId === user.id) {
           setFileName(temp.fileName || "");
           setHtmlCode(temp.htmlCode || "");
           setHasUnsavedChanges(true);
@@ -331,7 +331,7 @@ export const HtmlEditor = () => {
       try {
         const draft = JSON.parse(savedDraft);
         // Verify the draft belongs to the current user
-        if (!user || draft.userId === user.id) {
+        if (!user || !draft.userId || draft.userId === user.id) {
           setCurrentDraft(draft);
         }
       } catch (error) {
