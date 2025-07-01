@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -100,7 +101,9 @@ export const CustomDomainManager = () => {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${LOVABLE_API_TOKEN}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Origin': 'https://lovable.dev',
+          'Referer': 'https://lovable.dev/'
         }
       });
 
