@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -381,11 +380,9 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
 
       {publishingProject && (
         <PublishDialog 
-          isOpen={showPublishDialog}
-          onClose={() => setShowPublishDialog(false)}
-          htmlContent={publishingProject.html}
-          projectId={publishingProject.id}
-          title={publishingProject.name}
+          open={showPublishDialog}
+          onOpenChange={setShowPublishDialog}
+          project={publishingProject}
         />
       )}
     </div>
