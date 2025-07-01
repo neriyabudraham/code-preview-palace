@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,9 @@ export const CustomDomainManager = () => {
           setIsDomainVerified(profile.domain_verified || false);
           setCustomDomain(profile.custom_domain || "");
           console.log('Loaded domain config:', profile);
+        } else {
+          // Profile doesn't exist yet, but that's OK - it will be created when saving domain
+          console.log('No profile found for user, will create when saving domain');
         }
       } catch (error) {
         console.error('Error in loadDomainConfig:', error);
@@ -97,13 +101,17 @@ export const CustomDomainManager = () => {
     try {
       console.log('Saving domain for user:', user.id, 'Domain:', customDomain.trim());
       
+      // Use upsert to either insert or update the profile record
       const { error } = await supabase
         .from('profiles')
         .upsert({
           id: user.id,
           email: user.email,
           custom_domain: customDomain.trim(),
-          domain_verified: false
+          domain_verified: false,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'id'
         });
 
       if (error) {
@@ -158,7 +166,8 @@ export const CustomDomainManager = () => {
         .from('profiles')
         .update({
           custom_domain: null,
-          domain_verified: false
+          domain_verified: false,
+          updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
 
