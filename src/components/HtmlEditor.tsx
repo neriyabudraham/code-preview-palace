@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -98,7 +98,111 @@ export const HtmlEditor = () => {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [isEditingExisting, setIsEditingExisting] = useState(false);
   const [isSampleMode, setIsSampleMode] = useState(true);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
   const { toast } = useToast();
+  
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedContentRef = useRef<string>("");
+
+  // Auto-save function
+  const autoSave = useCallback(async () => {
+    if (isSampleMode || !htmlCode.trim() || !fileName.trim()) {
+      return;
+    }
+
+    // Don't auto-save if content hasn't changed
+    if (lastSavedContentRef.current === htmlCode) {
+      return;
+    }
+
+    setIsAutoSaving(true);
+    
+    try {
+      const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
+      const now = new Date().toISOString();
+      
+      if (isEditingExisting && currentProjectId) {
+        // Update existing project
+        const projectIndex = savedProjects.findIndex((p: any) => p.id === currentProjectId);
+        if (projectIndex !== -1) {
+          const existingProject = savedProjects[projectIndex];
+          
+          // Create version history entry only if there's a significant change
+          if (existingProject.html !== htmlCode) {
+            if (!existingProject.versions) {
+              existingProject.versions = [];
+            }
+            
+            // Add current version to history
+            existingProject.versions.unshift({
+              id: Date.now().toString() + "_v",
+              html: existingProject.html,
+              savedAt: existingProject.updatedAt,
+              version: (existingProject.versions.length || 0) + 1
+            });
+            
+            // Keep only last 10 versions
+            if (existingProject.versions.length > 10) {
+              existingProject.versions = existingProject.versions.slice(0, 10);
+            }
+          }
+          
+          // Update current project
+          savedProjects[projectIndex] = {
+            ...existingProject,
+            name: fileName,
+            html: htmlCode,
+            updatedAt: now,
+          };
+        }
+      } else {
+        // Create new project for auto-save
+        const project = {
+          id: Date.now().toString(),
+          name: fileName,
+          html: htmlCode,
+          createdAt: now,
+          updatedAt: now,
+          versions: []
+        };
+
+        savedProjects.push(project);
+        setCurrentProjectId(project.id);
+        setIsEditingExisting(true);
+      }
+
+      localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
+      lastSavedContentRef.current = htmlCode;
+      
+      console.log("Auto-saved successfully");
+    } catch (error) {
+      console.error("Auto-save failed:", error);
+    } finally {
+      setIsAutoSaving(false);
+    }
+  }, [htmlCode, fileName, currentProjectId, isEditingExisting, isSampleMode]);
+
+  // Set up auto-save when content changes
+  useEffect(() => {
+    if (isSampleMode) return;
+
+    // Clear existing timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    // Set new timeout for auto-save (2 seconds after user stops typing)
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      autoSave();
+    }, 2000);
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [htmlCode, fileName, autoSave, isSampleMode]);
 
   useEffect(() => {
     // Check if there's an editing project in sessionStorage
@@ -111,6 +215,7 @@ export const HtmlEditor = () => {
         setCurrentProjectId(project.id);
         setIsEditingExisting(true);
         setIsSampleMode(false);
+        lastSavedContentRef.current = project.html;
         // Clear the sessionStorage after loading
         sessionStorage.removeItem("editingProject");
         
@@ -141,12 +246,20 @@ export const HtmlEditor = () => {
     }
   };
 
+  const handleFileNameChange = (newFileName: string) => {
+    setFileName(newFileName);
+    if (isSampleMode && newFileName.trim()) {
+      setIsSampleMode(false);
+    }
+  };
+
   const handleNewPage = () => {
     setHtmlCode(EMPTY_HTML);
     setFileName("דף חדש");
     setCurrentProjectId(null);
     setIsEditingExisting(false);
     setIsSampleMode(false);
+    lastSavedContentRef.current = "";
     toast({
       title: "דף חדש",
       description: "נוצר דף חדש",
@@ -172,62 +285,12 @@ export const HtmlEditor = () => {
       return;
     }
 
-    const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
-    const now = new Date().toISOString();
-    
-    if (isEditingExisting && currentProjectId) {
-      // Update existing project and create version history
-      const projectIndex = savedProjects.findIndex((p: any) => p.id === currentProjectId);
-      if (projectIndex !== -1) {
-        const existingProject = savedProjects[projectIndex];
-        
-        // Create version history entry
-        if (!existingProject.versions) {
-          existingProject.versions = [];
-        }
-        
-        // Add current version to history
-        existingProject.versions.unshift({
-          id: Date.now().toString() + "_v",
-          html: existingProject.html,
-          savedAt: existingProject.updatedAt,
-          version: (existingProject.versions.length || 0) + 1
-        });
-        
-        // Keep only last 10 versions
-        if (existingProject.versions.length > 10) {
-          existingProject.versions = existingProject.versions.slice(0, 10);
-        }
-        
-        // Update current project
-        savedProjects[projectIndex] = {
-          ...existingProject,
-          name: fileName,
-          html: htmlCode,
-          updatedAt: now,
-        };
-      }
-    } else {
-      // Create new project
-      const project = {
-        id: Date.now().toString(),
-        name: fileName,
-        html: htmlCode,
-        createdAt: now,
-        updatedAt: now,
-        versions: []
-      };
-
-      savedProjects.push(project);
-      setCurrentProjectId(project.id);
-      setIsEditingExisting(true);
-    }
-
-    localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
-    
-    toast({
-      title: "נשמר בהצלחה!",
-      description: `הקובץ "${fileName}" נשמר`,
+    // Force immediate save
+    autoSave().then(() => {
+      toast({
+        title: "נשמר בהצלחה!",
+        description: `הקובץ "${fileName}" נשמר`,
+      });
     });
   };
 
@@ -245,6 +308,7 @@ export const HtmlEditor = () => {
     setFileName(duplicateName);
     setCurrentProjectId(null);
     setIsEditingExisting(false);
+    lastSavedContentRef.current = "";
     
     toast({
       title: "שוכפל בהצלחה",
@@ -258,6 +322,7 @@ export const HtmlEditor = () => {
     setCurrentProjectId(null);
     setIsEditingExisting(false);
     setIsSampleMode(true);
+    lastSavedContentRef.current = "";
     toast({
       title: "אופס!",
       description: "הקוד אופס למצב הבסיסי",
@@ -270,7 +335,7 @@ export const HtmlEditor = () => {
         <div className="flex items-center gap-4 mb-4">
           <Input
             value={fileName}
-            onChange={(e) => setFileName(e.target.value)}
+            onChange={(e) => handleFileNameChange(e.target.value)}
             placeholder="שם הקובץ..."
             className="flex-1 bg-gray-700 border-gray-600 text-white"
             disabled={isSampleMode}
@@ -282,20 +347,33 @@ export const HtmlEditor = () => {
             <Copy size={16} className="mr-2" />
             שכפל
           </Button>
-          <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700" disabled={isSampleMode}>
+          <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700" disabled={isSampleMode || isAutoSaving}>
             <Save size={16} className="mr-2" />
-            שמור
+            {isAutoSaving ? "שומר..." : "שמור"}
           </Button>
           <Button onClick={handleReset} variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700">
             <RotateCcw size={16} className="mr-2" />
             איפוס
           </Button>
         </div>
-        {isSampleMode && (
-          <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-3 text-blue-200 text-sm">
-            זהו דף לדוגמא - התחל להקליד כדי לערוך קוד חדש
-          </div>
-        )}
+        
+        <div className="flex gap-2">
+          {isSampleMode && (
+            <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-3 text-blue-200 text-sm flex-1">
+              זהו דף לדוגמא - התחל להקליד כדי לערוך קוד חדש
+            </div>
+          )}
+          {!isSampleMode && (
+            <div className="bg-green-900/30 border border-green-700 rounded-lg p-3 text-green-200 text-sm flex-1">
+              🔄 שמירה אוטומטית פעילה - השינויים נשמרים אוטומטיים
+            </div>
+          )}
+          {isAutoSaving && (
+            <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-3 text-yellow-200 text-sm">
+              💾 שומר...
+            </div>
+          )}
+        </div>
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[calc(100vh-300px)]">
