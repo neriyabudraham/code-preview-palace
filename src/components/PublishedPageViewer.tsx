@@ -2,7 +2,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
 
 export const PublishedPageViewer = () => {
   const { slug } = useParams();
@@ -92,12 +91,9 @@ export const PublishedPageViewer = () => {
     }
   }, [htmlContent]);
 
+  // Don't show anything while loading - just wait
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <Loader2 className="h-8 w-8 animate-spin text-black" />
-      </div>
-    );
+    return null;
   }
 
   if (error) {
