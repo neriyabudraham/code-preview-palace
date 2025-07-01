@@ -108,7 +108,14 @@ export default function Auth() {
     }
 
     try {
-      const { error } = await signUp(email, password);
+      // Fixed signup with correct redirect URL
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: 'https://html-to-site.lovable.app/auth'
+        }
+      });
       
       if (error) {
         if (error.message.includes('User already registered')) {

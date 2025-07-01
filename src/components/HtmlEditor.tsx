@@ -422,8 +422,8 @@ export const HtmlEditor = () => {
     return "פרסום";
   };
 
-  // Updated save button logic - always enabled when filename is provided
-  const canSave = fileName.trim();
+  // Fixed save button logic - check for both filename AND html content
+  const canSave = fileName.trim() && htmlCode.trim();
   const canPublish = fileName.trim() && lastSavedProject;
 
   return (
