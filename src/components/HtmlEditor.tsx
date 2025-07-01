@@ -9,8 +9,6 @@ import { PublishDialog } from "./PublishDialog";
 import { Save, Play, RotateCcw, Copy, Share2, FileText, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 
 const EMPTY_HTML = "";
 
@@ -26,7 +24,6 @@ export const HtmlEditor = () => {
   const [currentDraft, setCurrentDraft] = useState<any>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
   
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef<string>("");
@@ -37,64 +34,6 @@ export const HtmlEditor = () => {
     const project = savedProjects.find((p: any) => p.id === projectId);
     return project && (project.publishedUrl || project.customSlug);
   }, []);
-
-  // Save draft to Supabase for authenticated users
-  const saveDraftToSupabase = useCallback(async (draft: any) => {
-    if (!user) return;
-    
-    try {
-      const { error } = await supabase
-        .from('user_drafts')
-        .upsert({
-          user_id: user.id,
-          project_id: draft.id,
-          file_name: draft.fileName,
-          html_content: draft.htmlCode,
-          created_at: draft.savedAt
-        });
-      
-      if (error) {
-        console.error('Error saving draft to Supabase:', error);
-      }
-    } catch (error) {
-      console.error('Error saving draft:', error);
-    }
-  }, [user]);
-
-  // Load draft from Supabase for authenticated users
-  const loadDraftFromSupabase = useCallback(async () => {
-    if (!user) return null;
-    
-    try {
-      const { data, error } = await supabase
-        .from('user_drafts')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      
-      if (error) {
-        console.error('Error loading draft from Supabase:', error);
-        return null;
-      }
-      
-      if (data) {
-        return {
-          id: data.project_id,
-          fileName: data.file_name,
-          htmlCode: data.html_content,
-          savedAt: data.created_at,
-          isDraft: true
-        };
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Error loading draft:', error);
-      return null;
-    }
-  }, [user]);
 
   // Save temporary work when filename changes
   const saveTempWork = useCallback(() => {
@@ -109,7 +48,7 @@ export const HtmlEditor = () => {
   }, [fileName, htmlCode]);
 
   // Save draft only when exiting without saving
-  const saveDraftOnExit = useCallback(async () => {
+  const saveDraftOnExit = useCallback(() => {
     if (hasUnsavedChanges && (htmlCode.trim() || fileName.trim())) {
       const draft = {
         id: currentProjectId || 'draft_' + Date.now(),
@@ -118,18 +57,10 @@ export const HtmlEditor = () => {
         savedAt: new Date().toISOString(),
         isDraft: true
       };
-      
-      if (user) {
-        // Save to Supabase for authenticated users
-        await saveDraftToSupabase(draft);
-      } else {
-        // Fallback to localStorage for non-authenticated users
-        localStorage.setItem("editorDraft", JSON.stringify(draft));
-      }
-      
+      localStorage.setItem("editorDraft", JSON.stringify(draft));
       console.log('Draft saved on exit:', draft);
     }
-  }, [htmlCode, fileName, currentProjectId, hasUnsavedChanges, user, saveDraftToSupabase]);
+  }, [htmlCode, fileName, currentProjectId, hasUnsavedChanges]);
 
   // Set up beforeunload event to save draft when leaving
   useEffect(() => {
@@ -237,20 +168,8 @@ export const HtmlEditor = () => {
       lastSavedContentRef.current = htmlCode;
       setHasUnsavedChanges(false);
       
-      // Clear draft after successful save
-      if (user) {
-        try {
-          await supabase
-            .from('user_drafts')
-            .delete()
-            .eq('user_id', user.id);
-        } catch (error) {
-          console.error('Error clearing draft from Supabase:', error);
-        }
-      } else {
-        localStorage.removeItem("editorDraft");
-      }
-      
+      // Clear draft and temp work after successful save
+      localStorage.removeItem("editorDraft");
       localStorage.removeItem("tempEditorWork");
       setCurrentDraft(null);
       
@@ -266,7 +185,7 @@ export const HtmlEditor = () => {
     } finally {
       setIsAutoSaving(false);
     }
-  }, [htmlCode, fileName, currentProjectId, isEditingExisting, toast, checkIfProjectIsPublished, user]);
+  }, [htmlCode, fileName, currentProjectId, isEditingExisting, toast, checkIfProjectIsPublished]);
 
   // Track changes to mark unsaved changes
   useEffect(() => {
@@ -357,31 +276,16 @@ export const HtmlEditor = () => {
     setHasUnsavedChanges(false);
     
     // Check if there's a draft to restore
-    const loadDraft = async () => {
-      let draft = null;
-      
-      if (user) {
-        // Load from Supabase for authenticated users
-        draft = await loadDraftFromSupabase();
-      } else {
-        // Fallback to localStorage for non-authenticated users
-        const savedDraft = localStorage.getItem("editorDraft");
-        if (savedDraft) {
-          try {
-            draft = JSON.parse(savedDraft);
-          } catch (error) {
-            console.error("Error loading draft:", error);
-          }
-        }
-      }
-      
-      if (draft) {
+    const savedDraft = localStorage.getItem("editorDraft");
+    if (savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft);
         setCurrentDraft(draft);
+      } catch (error) {
+        console.error("Error loading draft:", error);
       }
-    };
-    
-    loadDraft();
-  }, [toast, checkIfProjectIsPublished, user, loadDraftFromSupabase]);
+    }
+  }, [toast, checkIfProjectIsPublished]);
 
   const handleCodeChange = (newCode: string) => {
     setHtmlCode(newCode);
@@ -431,20 +335,8 @@ export const HtmlEditor = () => {
     }
   };
 
-  const handleClearDraft = async () => {
-    if (user) {
-      try {
-        await supabase
-          .from('user_drafts')
-          .delete()
-          .eq('user_id', user.id);
-      } catch (error) {
-        console.error('Error clearing draft from Supabase:', error);
-      }
-    } else {
-      localStorage.removeItem("editorDraft");
-    }
-    
+  const handleClearDraft = () => {
+    localStorage.removeItem("editorDraft");
     setCurrentDraft(null);
     toast({
       title: "טיוטה נמחקה",
@@ -462,7 +354,7 @@ export const HtmlEditor = () => {
       return;
     }
 
-    // Force immediate save - allow saving even with empty HTML content
+    // Force immediate save - removed HTML content check
     await autoSave();
     
     // Make sure the project is available for publishing immediately after save
@@ -530,8 +422,8 @@ export const HtmlEditor = () => {
     return "פרסום";
   };
 
-  // Fixed save button logic - only require filename, HTML content can be empty
-  const canSave = fileName.trim();
+  // Fixed save button logic - check for both filename AND html content
+  const canSave = fileName.trim() && htmlCode.trim();
   const canPublish = fileName.trim() && lastSavedProject;
 
   return (
