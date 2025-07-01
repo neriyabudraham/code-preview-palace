@@ -35,6 +35,18 @@ export const HtmlEditor = () => {
     return project && (project.publishedUrl || project.customSlug);
   }, []);
 
+  // Save temporary work when filename changes
+  const saveTempWork = useCallback(() => {
+    if (fileName.trim() || htmlCode.trim()) {
+      const tempWork = {
+        fileName: fileName || '',
+        htmlCode: htmlCode || '',
+        savedAt: new Date().toISOString()
+      };
+      localStorage.setItem("tempEditorWork", JSON.stringify(tempWork));
+    }
+  }, [fileName, htmlCode]);
+
   // Save draft only when exiting without saving
   const saveDraftOnExit = useCallback(() => {
     if (hasUnsavedChanges && (htmlCode.trim() || fileName.trim())) {
@@ -64,9 +76,14 @@ export const HtmlEditor = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [saveDraftOnExit, hasUnsavedChanges]);
 
+  // Save temporary work when content changes
+  useEffect(() => {
+    saveTempWork();
+  }, [fileName, htmlCode, saveTempWork]);
+
   // Auto-save function
   const autoSave = useCallback(async () => {
-    if (!htmlCode.trim() || !fileName.trim()) {
+    if (!fileName.trim()) {
       return;
     }
 
@@ -151,8 +168,9 @@ export const HtmlEditor = () => {
       lastSavedContentRef.current = htmlCode;
       setHasUnsavedChanges(false);
       
-      // Clear draft after successful save
+      // Clear draft and temp work after successful save
       localStorage.removeItem("editorDraft");
+      localStorage.removeItem("tempEditorWork");
       setCurrentDraft(null);
       
       // Set last saved project for publish functionality
@@ -178,7 +196,7 @@ export const HtmlEditor = () => {
 
   // Set up auto-save when content changes
   useEffect(() => {
-    if (!htmlCode.trim() || !fileName.trim()) return;
+    if (!fileName.trim()) return;
 
     // Clear existing timeout
     if (autoSaveTimeoutRef.current) {
@@ -222,6 +240,28 @@ export const HtmlEditor = () => {
         return;
       } catch (error) {
         console.error("Error loading project:", error);
+      }
+    }
+
+    // Check if there's temporary work to restore
+    const tempWork = localStorage.getItem("tempEditorWork");
+    if (tempWork) {
+      try {
+        const temp = JSON.parse(tempWork);
+        setFileName(temp.fileName || "");
+        setHtmlCode(temp.htmlCode || "");
+        setHasUnsavedChanges(true);
+        localStorage.removeItem("tempEditorWork");
+        
+        if (temp.fileName || temp.htmlCode) {
+          toast({
+            title: "עבודה זמנית שוחזרה",
+            description: "העבודה הקודמת שלך שוחזרה",
+          });
+        }
+        return;
+      } catch (error) {
+        console.error("Error loading temp work:", error);
       }
     }
 
@@ -314,16 +354,7 @@ export const HtmlEditor = () => {
       return;
     }
 
-    if (!htmlCode.trim()) {
-      toast({
-        title: "שגיאה",
-        description: "אנא הזן תוכן HTML",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Force immediate save
+    // Force immediate save - removed HTML content check
     await autoSave();
     
     // Make sure the project is available for publishing immediately after save
@@ -341,15 +372,6 @@ export const HtmlEditor = () => {
   };
 
   const handleDuplicate = () => {
-    if (!htmlCode.trim()) {
-      toast({
-        title: "לא ניתן לשכפל",
-        description: "אין תוכן לשכפול",
-        variant: "destructive",
-      });
-      return;
-    }
-
     const duplicateName = fileName ? `${fileName} - עותק` : "עותק";
     setFileName(duplicateName);
     setCurrentProjectId(null);
@@ -400,9 +422,9 @@ export const HtmlEditor = () => {
     return "פרסום";
   };
 
-  // Fix the content empty check
-  const isContentEmpty = !htmlCode.trim() && !fileName.trim();
-  const canSaveOrPublish = htmlCode.trim() && fileName.trim();
+  // Updated save button logic - always enabled when filename is provided
+  const canSave = fileName.trim();
+  const canPublish = fileName.trim() && lastSavedProject;
 
   return (
     <div className="space-y-6">
@@ -429,7 +451,6 @@ export const HtmlEditor = () => {
               onClick={handleDuplicate} 
               variant="outline" 
               className="border-slate-600 bg-slate-800/50 text-slate-300 hover:bg-slate-700 hover:text-white hover:border-slate-500 transition-all duration-200 h-12 px-4"
-              disabled={isContentEmpty}
             >
               <Copy size={18} className="mr-2" />
               שכפל
@@ -441,13 +462,13 @@ export const HtmlEditor = () => {
           <Button 
             onClick={handleSave} 
             className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 border-0 text-white shadow-lg hover:shadow-xl transition-all duration-200 h-12 px-8 font-semibold text-base" 
-            disabled={!canSaveOrPublish || isAutoSaving}
+            disabled={!canSave || isAutoSaving}
           >
             <Save size={18} className="mr-2" />
             {isAutoSaving ? "שומר..." : "שמור"}
           </Button>
           
-          {canSaveOrPublish && lastSavedProject && (
+          {canPublish && (
             <Button 
               onClick={handlePublish} 
               className="bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 border-0 text-white shadow-lg hover:shadow-xl transition-all duration-200 h-12 px-8 font-semibold text-base"
@@ -501,7 +522,7 @@ export const HtmlEditor = () => {
         )}
         
         <div className="flex gap-2">
-          {!isContentEmpty && (
+          {fileName.trim() && (
             <div className="bg-emerald-900/40 border border-emerald-700/50 rounded-xl p-4 text-emerald-200 text-sm flex-1 backdrop-blur-sm">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>

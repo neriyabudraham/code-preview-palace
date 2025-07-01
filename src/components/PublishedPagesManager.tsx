@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -122,7 +121,7 @@ export const PublishedPagesManager = () => {
 
       toast({
         title: "פרויקט נשמר!",
-        description: `הפרויקט "${page.title}" נשמר בהצלחה למחשב`,
+        description: `הפרויקט "${page.title}" נשמר בהצלחה בפרוייקטים`,
       });
 
     } catch (error) {
@@ -250,7 +249,7 @@ export const PublishedPagesManager = () => {
     if (page.custom_domain) {
       return `https://${page.custom_domain}/${page.slug}`;
     }
-    return `https://code-preview-palace.lovable.app/${page.slug}`;
+    return `https://html-to-site.lovable.app/${page.slug}`;
   };
 
   const copyUrl = (url: string) => {
