@@ -95,29 +95,24 @@ export const CustomDomainManager = () => {
 
   const getAuthToken = async () => {
     try {
-      console.log('Getting fresh auth token from Lovable API');
-      
-      const response = await fetch(LOVABLE_AUTH_TOKEN_URL, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_TOKEN}`,
-          'Content-Type': 'application/json',
-          'Origin': 'https://lovable.dev',
-          'Referer': 'https://lovable.dev/'
-        }
+      console.log('Fetching fresh auth token from your proxy server...');
+  
+      const response = await fetch("http://161.97.68.203:3100/get-lovable-token", {
+        method: 'GET'
       });
-
+  
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Failed to get auth token:', response.status, errorText);
+        console.error('Failed to get auth token via proxy:', response.status, errorText);
         throw new Error(`Failed to get auth token: ${response.status}`);
       }
-
+  
       const result = await response.json();
       console.log('Got fresh auth token:', result);
+  
       return result.token;
     } catch (error) {
-      console.error('Error getting auth token:', error);
+      console.error('Error getting auth token via proxy:', error);
       throw error;
     }
   };
