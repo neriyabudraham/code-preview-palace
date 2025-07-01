@@ -39,10 +39,59 @@ Deno.serve(async (req) => {
 
     if (!slug) {
       console.log('No slug found, returning 404');
-      return new Response('Page not found', { 
+      const html404 = `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>דף לא נמצא</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            padding: 3rem;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
+        p {
+            font-size: 1.2rem;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>404</h1>
+        <p>הדף שחיפשת לא נמצא</p>
+        <p>יתכן שהקישור שגוי או שהדף הוסר</p>
+    </div>
+</body>
+</html>`;
+      
+      return new Response(html404, { 
         status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' }
-      })
+        headers: { 
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-cache'
+        }
+      });
     }
 
     // Initialize Supabase client with service role key and bypass auth
@@ -56,7 +105,9 @@ Deno.serve(async (req) => {
       console.error('Missing Supabase configuration');
       return new Response('Server configuration error', { 
         status: 500,
-        headers: corsHeaders
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8'
+        }
       });
     }
 
@@ -82,101 +133,143 @@ Deno.serve(async (req) => {
       console.error('Database error:', error);
       return new Response('Database error', { 
         status: 500,
-        headers: corsHeaders
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8'
+        }
       });
     }
 
     if (!page) {
       console.log('Page not found in database for slug:', slug);
-      return new Response(`
-        <!DOCTYPE html>
-        <html lang="he" dir="rtl">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>דף לא נמצא</title>
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    margin: 0;
-                    padding: 0;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    min-height: 100vh;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    text-align: center;
-                }
-                .container {
-                    background: rgba(255,255,255,0.1);
-                    padding: 3rem;
-                    border-radius: 20px;
-                    backdrop-filter: blur(10px);
-                    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-                }
-                h1 {
-                    font-size: 3rem;
-                    margin-bottom: 1rem;
-                    opacity: 0.9;
-                }
-                p {
-                    font-size: 1.2rem;
-                    opacity: 0.8;
-                }
-                .debug {
-                    font-size: 0.8rem;
-                    opacity: 0.6;
-                    margin-top: 2rem;
-                    font-family: monospace;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>404</h1>
-                <p>הדף שחיפשת לא נמצא</p>
-                <p>יתכן שהקישור שגוי או שהדף הוסר</p>
-                <div class="debug">
-                    <p>נחפש עבור: ${slug}</p>
-                    <p>נתיב: ${url.pathname}</p>
-                    <p>שעה: ${new Date().toLocaleString('he-IL')}</p>
-                </div>
-            </div>
-        </body>
-        </html>
-      `, { 
+      const html404 = `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>דף לא נמצא</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            padding: 3rem;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
+        p {
+            font-size: 1.2rem;
+            opacity: 0.8;
+        }
+        .debug {
+            font-size: 0.8rem;
+            opacity: 0.6;
+            margin-top: 2rem;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>404</h1>
+        <p>הדף שחיפשת לא נמצא</p>
+        <p>יתכן שהקישור שגוי או שהדף הוסר</p>
+        <div class="debug">
+            <p>נחפש עבור: ${slug}</p>
+            <p>נתיב: ${url.pathname}</p>
+            <p>שעה: ${new Date().toLocaleString('he-IL')}</p>
+        </div>
+    </div>
+</body>
+</html>`;
+      
+      return new Response(html404, { 
         status: 404,
         headers: { 
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'no-cache'
         }
-      })
+      });
     }
 
     console.log('Serving page for slug:', slug);
     
-    // Make sure the HTML content is properly encoded
-    const htmlContent = page.html_content;
-    
-    // Return the HTML content with proper headers for rendering
-    return new Response(htmlContent, {
+    // Return the HTML content with proper headers
+    return new Response(page.html_content, {
       status: 200,
       headers: { 
         'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'public, max-age=3600',
-        // Add additional headers to ensure proper rendering
-        'X-Content-Type-Options': 'nosniff'
+        'Cache-Control': 'public, max-age=300',
+        'Access-Control-Allow-Origin': '*'
       }
-    })
+    });
 
   } catch (error) {
-    console.error('Unexpected error:', error)
-    return new Response('Internal Server Error', { 
+    console.error('Unexpected error:', error);
+    const errorHtml = `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>שגיאה בשרת</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f0f0f0;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        .container {
+            background: white;
+            padding: 3rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #e74c3c;
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+        p {
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>שגיאה בשרת</h1>
+        <p>אירעה שגיאה בעת טעינת הדף</p>
+        <p>אנא נסה שנית מאוחר יותר</p>
+    </div>
+</body>
+</html>`;
+    
+    return new Response(errorHtml, { 
       status: 500,
       headers: { 
         'Content-Type': 'text/html; charset=utf-8'
       }
-    })
+    });
   }
-})
+});

@@ -203,8 +203,8 @@ export const HtmlEditor = () => {
       localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
       lastSavedContentRef.current = htmlCode;
       
-      // Set last saved project for publish functionality
-      const currentProject = savedProjects.find((p: any) => p.id === currentProjectId || p.name === fileName);
+      // Set last saved project for publish functionality - make sure it's available immediately
+      const currentProject = savedProjects.find((p: any) => p.id === currentProjectId || (p.name === fileName && p.html === htmlCode));
       if (currentProject) {
         setLastSavedProject(currentProject);
       }
@@ -334,7 +334,7 @@ export const HtmlEditor = () => {
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (isSampleMode) {
       toast({
         title: "לא ניתן לשמור",
@@ -354,11 +354,18 @@ export const HtmlEditor = () => {
     }
 
     // Force immediate save
-    autoSave().then(() => {
-      toast({
-        title: "נשמר בהצלחה!",
-        description: `הקובץ "${fileName}" נשמר`,
-      });
+    await autoSave();
+    
+    // Make sure the project is available for publishing immediately after save
+    const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
+    const savedProject = savedProjects.find((p: any) => p.id === currentProjectId || (p.name === fileName && p.html === htmlCode));
+    if (savedProject) {
+      setLastSavedProject(savedProject);
+    }
+    
+    toast({
+      title: "נשמר בהצלחה!",
+      description: `הקובץ "${fileName}" נשמר`,
     });
   };
 
@@ -455,10 +462,12 @@ export const HtmlEditor = () => {
             {isAutoSaving ? "שומר..." : "שמור"}
           </Button>
           
-          {lastSavedProject && (
+          {/* Show publish button even during sample mode, but show it as available after saving */}
+          {(lastSavedProject || (!isSampleMode && fileName.trim() && htmlCode.trim())) && (
             <Button 
               onClick={handlePublish} 
               className="bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 border-0 text-white shadow-lg hover:shadow-xl transition-all duration-200 h-12 px-8 font-semibold text-base"
+              disabled={!lastSavedProject}
             >
               <Share2 size={18} className="mr-2" />
               פרסום
