@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -8,6 +8,7 @@ export const PublishedPageViewer = () => {
   const [htmlContent, setHtmlContent] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     const fetchPage = async () => {
@@ -77,6 +78,19 @@ export const PublishedPageViewer = () => {
     fetchPage();
   }, [slug]);
 
+  // Use iframe to properly render HTML content
+  useEffect(() => {
+    if (htmlContent && iframeRef.current) {
+      const iframe = iframeRef.current;
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (doc) {
+        doc.open();
+        doc.write(htmlContent);
+        doc.close();
+      }
+    }
+  }, [htmlContent]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800">
@@ -100,11 +114,13 @@ export const PublishedPageViewer = () => {
     );
   }
 
-  // Render the HTML content directly
+  // Render the HTML content using iframe for proper isolation and rendering
   return (
-    <div 
-      className="w-full h-screen"
-      dangerouslySetInnerHTML={{ __html: htmlContent }}
+    <iframe
+      ref={iframeRef}
+      className="w-full h-screen border-0"
+      title="Published Page"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
     />
   );
 };

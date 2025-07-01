@@ -158,7 +158,7 @@ export const PublishedPagesManager = () => {
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  onClick={() => window.open(`https://page.neriyabudraham.co.il/${page.slug}`, '_blank')}
+                  onClick={() => window.open(`/${page.slug}`, '_blank')}
                   className="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg transition-all duration-200 font-semibold"
                 >
                   <ExternalLink size={14} className="mr-1" />
@@ -176,7 +176,7 @@ export const PublishedPagesManager = () => {
                       <AlertDialogTitle className="text-white">מחיקת דף מפורסם</AlertDialogTitle>
                       <AlertDialogDescription className="text-slate-400">
                         האם אתה בטוח שברצונך למחוק את הדף "{page.title}" מהפרסום? 
-                        הדף לא יהיה זמין יותר בכתובת page.neriyabudraham.co.il/{page.slug}.
+                        הדף לא יהיה זמין יותר בכתובת /{page.slug}.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
