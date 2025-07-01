@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Globe, Copy, ExternalLink, Unlink } from "lucide-react";
+import { Globe, Copy, ExternalLink, Unlink, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -123,12 +123,14 @@ export const CustomDomainManager = () => {
       console.log('Saving domain for user:', user.id, 'Domain:', fullDomain);
       
       // Use upsert to either insert or update the profile record
+      // Automatically approve the domain (set domain_verified to true)
       const { error } = await supabase
         .from('profiles')
         .upsert({
           id: user.id,
           email: user.email,
           custom_domain: fullDomain,
+          domain_verified: true, // Automatically approve the domain
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'id'
@@ -142,8 +144,8 @@ export const CustomDomainManager = () => {
       setCurrentDomain(fullDomain);
 
       toast({
-        title: "נשמר בהצלחה! 🎉",
-        description: "הדומיין המותאם אישית נשמר ומוכן לשימוש",
+        title: "דומיין מאושר ונשמר! 🎉",
+        description: "הדומיין המותאם אישית אושר אוטומטית ומוכן לשימוש מיידי",
       });
     } catch (error: any) {
       console.error('Error saving domain:', error);
@@ -185,6 +187,7 @@ export const CustomDomainManager = () => {
         .from('profiles')
         .update({
           custom_domain: null,
+          domain_verified: false,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
@@ -268,8 +271,8 @@ export const CustomDomainManager = () => {
                     variant="default"
                     className="bg-green-600"
                   >
-                    <Globe className="w-4 h-4 mr-1" />
-                    מחובר
+                    <CheckCircle className="w-4 h-4 mr-1" />
+                    מאושר ופעיל
                   </Badge>
                   <Button
                     size="sm"
@@ -338,13 +341,34 @@ export const CustomDomainManager = () => {
               disabled={isLoading || !fullDomain}
               className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
             >
-              {isLoading ? "שומר..." : "שמור דומיין"}
+              {isLoading ? "שומר ומאשר..." : "שמור ואשר דומיין"}
             </Button>
           </div>
         </div>
       </Card>
 
-      <Card className="bg-gradient-to-br from-blue-900/20 via-purple-900/20 to-slate-900 border-blue-700/50 p-6">
+      <Card className="bg-gradient-to-br from-green-900/20 via-emerald-900/20 to-slate-900 border-green-700/50 p-6">
+        <div className="space-y-4">
+          <h3 className="text-xl font-bold text-white flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-green-400" />
+            אישור אוטומטי של דומיין
+          </h3>
+          
+          <div className="bg-green-900/30 border border-green-700/50 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-green-400 mb-3">
+              <CheckCircle className="w-5 h-5" />
+              <span className="font-semibold">הדומיין יאושר אוטומטית</span>
+            </div>
+            <div className="text-sm text-green-300 space-y-2">
+              <p>✅ כאשר תוסיף דומיין חדש, הוא יאושר מיידית ללא תהליך אימות</p>
+              <p>✅ הדפים שלך יהיו זמינים תחת הדומיין החדש תוך מספר דקות</p>
+              <p>✅ וודא שה-DNS מוגדר נכון לפני הוספת הדומיין</p>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="bg-gradient-to-br from-blue-900/20 via-purple-900/20 to-slate-800 border-blue-700/50 p-6">
         <div className="space-y-4">
           <h3 className="text-xl font-bold text-white flex items-center gap-2">
             <Globe className="w-5 h-5 text-blue-400" />
@@ -353,7 +377,7 @@ export const CustomDomainManager = () => {
           
           <div className="bg-slate-800 rounded-lg p-4 border border-slate-600">
             <p className="text-sm text-slate-300 mb-4">
-              להשלמת החיבור, יש להוסיף רשומת A בהגדרות ה-DNS של הדומיין:
+              וודא שהגדרת רשומת A בהגדרות ה-DNS של הדומיין:
             </p>
             
             <div className="space-y-3">
@@ -395,20 +419,9 @@ export const CustomDomainManager = () => {
             <div className="mt-4 text-xs text-slate-400 space-y-1">
               <p>• היכנס לפאנל הניהול של הדומיין שלך</p>
               <p>• הוסף רשומת A עם השם "{currentDomain || fullDomain || "הדומיין שלך"}" המצביעה לכתובת 185.158.133.1</p>
-              <p>• השינוי עשוי לקחת עד 48 שעות להפצה מלאה</p>
-              <p>• לאחר הגדרת ה-DNS, כל הדפים שלך יהיו זמינים תחת הדומיין החדש</p>
+              <p>• לאחר הגדרת ה-DNS, הוסף את הדומיין במערכת והוא יאושר אוטומטית</p>
+              <p>• כל הדפים שלך יהיו זמינים תחת הדומיין החדש תוך מספר דקות</p>
             </div>
-          </div>
-
-          <div className="bg-green-900/20 border border-green-700/50 rounded-lg p-4">
-            <div className="flex items-center gap-2 text-green-400">
-              <Globe className="w-5 h-5" />
-              <span className="font-semibold">הדומיין מוכן לשימוש</span>
-            </div>
-            <p className="text-sm text-green-300 mt-2">
-              לאחר הגדרת רשומת ה-DNS בספק הדומיין שלך, כל הדפים המפורסמים יהיו זמינים 
-              תחת הדומיין המותאם אישית שלך תוך מספר שעות.
-            </p>
           </div>
         </div>
       </Card>
