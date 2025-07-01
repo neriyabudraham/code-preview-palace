@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useUserProjects } from "@/hooks/use-user-projects";
+import { useUserProjects } from "@/hooks/useUserProjects";
 
 interface PublishedPage {
   id: string;
