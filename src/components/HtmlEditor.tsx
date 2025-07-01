@@ -5,105 +5,22 @@ import { Card } from "@/components/ui/card";
 import { CodeEditor } from "./CodeEditor";
 import { HtmlPreview } from "./HtmlPreview";
 import { PublishDialog } from "./PublishDialog";
-import { Save, Play, RotateCcw, Copy, Share2, FileText } from "lucide-react";
+import { Save, Play, RotateCcw, Copy, Share2, FileText, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 
-const EMPTY_HTML = `<!DOCTYPE html>
-<html lang="he" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>הדף הזה ריק</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 40px;
-            background: #f5f5f5;
-            color: #333;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .container {
-            text-align: center;
-            background: white;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #666;
-            font-size: 2rem;
-            margin: 0;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>הדף הזה ריק</h1>
-    </div>
-</body>
-</html>`;
-
-const SAMPLE_HTML = `<!DOCTYPE html>
-<html lang="he" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>דף לדוגמא</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 40px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            min-height: 100vh;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            text-align: center;
-        }
-        h1 {
-            font-size: 2.5rem;
-            margin-bottom: 20px;
-        }
-        p {
-            font-size: 1.2rem;
-            line-height: 1.6;
-        }
-        .note {
-            background: rgba(255,255,255,0.1);
-            padding: 20px;
-            border-radius: 10px;
-            margin-top: 30px;
-            font-size: 0.9rem;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>זהו דף לדוגמא</h1>
-        <p>אתה יכול להחליף את הקוד הזה בקוד שלך</p>
-        <div class="note">
-            <p>זהו רק דף רקע לדוגמא - לא ניתן לשמור אותו</p>
-        </div>
-    </div>
-</body>
-</html>`;
+const EMPTY_HTML = "";
 
 export const HtmlEditor = () => {
   const [htmlCode, setHtmlCode] = useState("");
   const [fileName, setFileName] = useState("");
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [isEditingExisting, setIsEditingExisting] = useState(false);
-  const [isSampleMode, setIsSampleMode] = useState(true);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [lastSavedProject, setLastSavedProject] = useState<any>(null);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [isProjectPublished, setIsProjectPublished] = useState(false);
+  const [currentDraft, setCurrentDraft] = useState<any>(null);
   const { toast } = useToast();
   
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -116,23 +33,24 @@ export const HtmlEditor = () => {
     return project && (project.publishedUrl || project.customSlug);
   }, []);
 
-  // Save editor state to localStorage
-  const saveEditorState = useCallback(() => {
-    if (!isSampleMode) {
-      const editorState = {
+  // Save editor state to localStorage as draft
+  const saveDraft = useCallback(() => {
+    if (htmlCode.trim() || fileName.trim()) {
+      const draft = {
+        id: currentProjectId || 'draft_' + Date.now(),
         htmlCode,
         fileName,
-        currentProjectId,
-        isEditingExisting,
-        isSampleMode: false
+        savedAt: new Date().toISOString(),
+        isDraft: true
       };
-      localStorage.setItem("editorState", JSON.stringify(editorState));
+      localStorage.setItem("editorDraft", JSON.stringify(draft));
+      setCurrentDraft(draft);
     }
-  }, [htmlCode, fileName, currentProjectId, isEditingExisting, isSampleMode]);
+  }, [htmlCode, fileName, currentProjectId]);
 
   // Auto-save function
   const autoSave = useCallback(async () => {
-    if (isSampleMode || !htmlCode.trim() || !fileName.trim()) {
+    if (!htmlCode.trim() || !fileName.trim()) {
       return;
     }
 
@@ -216,7 +134,11 @@ export const HtmlEditor = () => {
       localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
       lastSavedContentRef.current = htmlCode;
       
-      // Set last saved project for publish functionality - make sure it's available immediately
+      // Clear draft after successful save
+      localStorage.removeItem("editorDraft");
+      setCurrentDraft(null);
+      
+      // Set last saved project for publish functionality
       const currentProject = savedProjects.find((p: any) => p.id === currentProjectId || (p.name === fileName && p.html === htmlCode));
       if (currentProject) {
         setLastSavedProject(currentProject);
@@ -228,14 +150,14 @@ export const HtmlEditor = () => {
     } finally {
       setIsAutoSaving(false);
     }
-  }, [htmlCode, fileName, currentProjectId, isEditingExisting, isSampleMode, toast, checkIfProjectIsPublished]);
+  }, [htmlCode, fileName, currentProjectId, isEditingExisting, toast, checkIfProjectIsPublished]);
 
-  // Set up auto-save when content changes
+  // Set up auto-save and draft save when content changes
   useEffect(() => {
-    if (isSampleMode) return;
+    // Save as draft
+    saveDraft();
 
-    // Save editor state
-    saveEditorState();
+    if (!htmlCode.trim() || !fileName.trim()) return;
 
     // Clear existing timeout
     if (autoSaveTimeoutRef.current) {
@@ -253,7 +175,7 @@ export const HtmlEditor = () => {
         clearTimeout(autoSaveTimeoutRef.current);
       }
     };
-  }, [htmlCode, fileName, autoSave, isSampleMode, saveEditorState]);
+  }, [htmlCode, fileName, autoSave, saveDraft]);
 
   useEffect(() => {
     // Check if there's an editing project in sessionStorage (from project manager)
@@ -265,7 +187,6 @@ export const HtmlEditor = () => {
         setFileName(project.name);
         setCurrentProjectId(project.id);
         setIsEditingExisting(true);
-        setIsSampleMode(false);
         setLastSavedProject(project);
         setIsProjectPublished(checkIfProjectIsPublished(project.id));
         lastSavedContentRef.current = project.html;
@@ -282,89 +203,96 @@ export const HtmlEditor = () => {
       }
     }
 
-    // Check if there's a saved editor state
-    const savedEditorState = localStorage.getItem("editorState");
-    if (savedEditorState) {
-      try {
-        const editorState = JSON.parse(savedEditorState);
-        setHtmlCode(editorState.htmlCode);
-        setFileName(editorState.fileName);
-        setCurrentProjectId(editorState.currentProjectId);
-        setIsEditingExisting(editorState.isEditingExisting);
-        setIsSampleMode(false);
-        setIsProjectPublished(checkIfProjectIsPublished(editorState.currentProjectId));
-        lastSavedContentRef.current = editorState.htmlCode;
-        
-        // Find the project for publish functionality
-        const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
-        const currentProject = savedProjects.find((p: any) => p.id === editorState.currentProjectId);
-        if (currentProject) {
-          setLastSavedProject(currentProject);
-        }
-        
-        return;
-      } catch (error) {
-        console.error("Error loading editor state:", error);
-      }
-    }
-
-    // Show sample page when entering fresh
-    setHtmlCode(SAMPLE_HTML);
+    // Show empty editor when entering fresh
+    setHtmlCode(EMPTY_HTML);
     setFileName("");
     setCurrentProjectId(null);
     setIsEditingExisting(false);
-    setIsSampleMode(true);
     setLastSavedProject(null);
     setIsProjectPublished(false);
+    lastSavedContentRef.current = "";
+    
+    // Check if there's a draft to restore
+    const savedDraft = localStorage.getItem("editorDraft");
+    if (savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft);
+        setCurrentDraft(draft);
+      } catch (error) {
+        console.error("Error loading draft:", error);
+      }
+    }
   }, [toast, checkIfProjectIsPublished]);
 
   const handleCodeChange = (newCode: string) => {
-    if (isSampleMode) {
-      // Exit sample mode when user starts typing
-      setIsSampleMode(false);
-      setHtmlCode(newCode);
-    } else {
-      setHtmlCode(newCode);
-    }
+    setHtmlCode(newCode);
   };
 
   const handleFileNameChange = (newFileName: string) => {
     setFileName(newFileName);
-    if (isSampleMode && newFileName.trim()) {
-      setIsSampleMode(false);
-    }
   };
 
   const handleNewPage = () => {
+    // Save current work as draft if there's content
+    if (htmlCode.trim() || fileName.trim()) {
+      saveDraft();
+      toast({
+        title: "טיוטה נשמרה",
+        description: "העבודה הנוכחית נשמרה כטיוטה",
+      });
+    }
+    
     setHtmlCode(EMPTY_HTML);
-    setFileName("דף חדש");
+    setFileName("");
     setCurrentProjectId(null);
     setIsEditingExisting(false);
-    setIsSampleMode(false);
     setLastSavedProject(null);
     setIsProjectPublished(false);
     lastSavedContentRef.current = "";
-    localStorage.removeItem("editorState");
+    
     toast({
       title: "דף חדש",
       description: "נוצר דף חדש",
     });
   };
 
-  const handleSave = async () => {
-    if (isSampleMode) {
+  const handleRestoreDraft = () => {
+    if (currentDraft) {
+      setHtmlCode(currentDraft.htmlCode);
+      setFileName(currentDraft.fileName);
+      setCurrentProjectId(currentDraft.id.startsWith('draft_') ? null : currentDraft.id);
+      setIsEditingExisting(!currentDraft.id.startsWith('draft_'));
+      
       toast({
-        title: "לא ניתן לשמור",
-        description: "לא ניתן לשמור את דף הדוגמא. התחל לערוך קוד חדש.",
+        title: "טיוטה שוחזרה",
+        description: "הטיוטה נטענה בהצלחה",
+      });
+    }
+  };
+
+  const handleClearDraft = () => {
+    localStorage.removeItem("editorDraft");
+    setCurrentDraft(null);
+    toast({
+      title: "טיוטה נמחקה",
+      description: "הטיוטה נמחקה בהצלחה",
+    });
+  };
+
+  const handleSave = async () => {
+    if (!fileName.trim()) {
+      toast({
+        title: "שגיאה",
+        description: "אנא הזן שם לקובץ",
         variant: "destructive",
       });
       return;
     }
 
-    if (!fileName.trim()) {
+    if (!htmlCode.trim()) {
       toast({
         title: "שגיאה",
-        description: "אנא הזן שם לקובץ",
+        description: "אנא הזן תוכן HTML",
         variant: "destructive",
       });
       return;
@@ -388,7 +316,7 @@ export const HtmlEditor = () => {
   };
 
   const handleDuplicate = () => {
-    if (isSampleMode || !htmlCode.trim()) {
+    if (!htmlCode.trim()) {
       toast({
         title: "לא ניתן לשכפל",
         description: "אין תוכן לשכפול",
@@ -412,15 +340,14 @@ export const HtmlEditor = () => {
   };
 
   const handleReset = () => {
-    setHtmlCode(SAMPLE_HTML);
+    setHtmlCode(EMPTY_HTML);
     setFileName("");
     setCurrentProjectId(null);
     setIsEditingExisting(false);
-    setIsSampleMode(true);
     setLastSavedProject(null);
     setIsProjectPublished(false);
     lastSavedContentRef.current = "";
-    localStorage.removeItem("editorState");
+    
     toast({
       title: "אופס!",
       description: "הקוד אופס למצב הבסיסי",
@@ -446,6 +373,9 @@ export const HtmlEditor = () => {
     return "פרסום";
   };
 
+  const isContentEmpty = !htmlCode.trim();
+  const canSaveOrPublish = !isContentEmpty && fileName.trim();
+
   return (
     <div className="space-y-6">
       <Card className="p-6 bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800 border-slate-700 shadow-2xl">
@@ -457,7 +387,6 @@ export const HtmlEditor = () => {
               onChange={(e) => handleFileNameChange(e.target.value)}
               placeholder="שם הקובץ..."
               className="pr-12 bg-slate-800/70 border-slate-600 text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 h-12 text-lg"
-              disabled={isSampleMode}
             />
           </div>
           <div className="flex gap-3">
@@ -472,6 +401,7 @@ export const HtmlEditor = () => {
               onClick={handleDuplicate} 
               variant="outline" 
               className="border-slate-600 bg-slate-800/50 text-slate-300 hover:bg-slate-700 hover:text-white hover:border-slate-500 transition-all duration-200 h-12 px-4"
+              disabled={isContentEmpty}
             >
               <Copy size={18} className="mr-2" />
               שכפל
@@ -483,18 +413,16 @@ export const HtmlEditor = () => {
           <Button 
             onClick={handleSave} 
             className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 border-0 text-white shadow-lg hover:shadow-xl transition-all duration-200 h-12 px-8 font-semibold text-base" 
-            disabled={isSampleMode || isAutoSaving}
+            disabled={!canSaveOrPublish || isAutoSaving}
           >
             <Save size={18} className="mr-2" />
             {isAutoSaving ? "שומר..." : "שמור"}
           </Button>
           
-          {/* Show publish button even during sample mode, but show it as available after saving */}
-          {(lastSavedProject || (!isSampleMode && fileName.trim() && htmlCode.trim())) && (
+          {canSaveOrPublish && lastSavedProject && (
             <Button 
               onClick={handlePublish} 
               className="bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 border-0 text-white shadow-lg hover:shadow-xl transition-all duration-200 h-12 px-8 font-semibold text-base"
-              disabled={!lastSavedProject}
             >
               <Share2 size={18} className="mr-2" />
               {getPublishButtonText()}
@@ -511,16 +439,41 @@ export const HtmlEditor = () => {
           </Button>
         </div>
         
-        <div className="flex gap-2">
-          {isSampleMode && (
-            <div className="bg-blue-900/40 border border-blue-700/50 rounded-xl p-4 text-blue-200 text-sm flex-1 backdrop-blur-sm">
+        {/* Draft section */}
+        {currentDraft && (
+          <div className="bg-amber-900/40 border border-amber-700/50 rounded-xl p-4 text-amber-200 text-sm mb-4 backdrop-blur-sm">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                זהו דף לדוגמא - התחל להקליד כדי לערוך קוד חדש
+                <div className="w-2 h-2 bg-amber-400 rounded-full"></div>
+                <span>טיוטה זמינה: "{currentDraft.fileName || 'ללא שם'}"</span>
+                <span className="text-xs text-amber-300">
+                  ({new Date(currentDraft.savedAt).toLocaleString('he-IL')})
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleRestoreDraft}
+                  variant="outline"
+                  size="sm"
+                  className="border-amber-600 text-amber-200 hover:bg-amber-600 hover:text-white"
+                >
+                  שחזר
+                </Button>
+                <Button
+                  onClick={handleClearDraft}
+                  variant="outline"
+                  size="sm"
+                  className="border-red-600 text-red-200 hover:bg-red-600 hover:text-white"
+                >
+                  <Trash2 size={16} />
+                </Button>
               </div>
             </div>
-          )}
-          {!isSampleMode && (
+          </div>
+        )}
+        
+        <div className="flex gap-2">
+          {!isContentEmpty && (
             <div className="bg-emerald-900/40 border border-emerald-700/50 rounded-xl p-4 text-emerald-200 text-sm flex-1 backdrop-blur-sm">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
@@ -553,7 +506,6 @@ export const HtmlEditor = () => {
               <div className="w-3 h-3 bg-green-500 rounded-full"></div>
             </div>
             <span className="text-sm text-slate-400 font-medium">עורך הקוד</span>
-            {isSampleMode && <span className="text-xs text-blue-400 bg-blue-900/30 px-2 py-1 rounded-full">(דוגמא)</span>}
           </div>
           <CodeEditor value={htmlCode} onChange={handleCodeChange} />
         </Card>

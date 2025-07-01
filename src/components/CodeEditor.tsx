@@ -46,7 +46,7 @@ export const CodeEditor = ({ value, onChange }: CodeEditorProps) => {
         ref={textareaRef}
         value={value}
         className="w-full h-full bg-gray-900 text-green-400 font-mono text-sm p-4 border border-gray-600 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed"
-        placeholder="הזן את קוד ה-HTML שלך כאן..."
+        placeholder="הזן כאן את קוד ה-html שלך..."
         style={{
           fontFamily: 'Consolas, Monaco, "Courier New", monospace',
           lineHeight: '1.5',
