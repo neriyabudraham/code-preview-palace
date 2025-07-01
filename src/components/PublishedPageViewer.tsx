@@ -23,7 +23,8 @@ export const PublishedPageViewer = () => {
         
         // Get the current hostname to check if it's a custom domain
         const currentHost = window.location.hostname;
-        const isCustomDomain = currentHost !== 'page.neriyabudraham.co.il' && 
+        const isCustomDomain = currentHost !== 'code-preview-palace.lovable.app' && 
+                              currentHost !== 'page.neriyabudraham.co.il' &&
                               currentHost !== 'localhost' && 
                               currentHost !== '127.0.0.1';
         
@@ -35,8 +36,12 @@ export const PublishedPageViewer = () => {
           .eq('slug', slug);
         
         // If accessing via custom domain, filter by that domain
+        // If accessing via default domains, get pages without custom domain OR with matching custom domain
         if (isCustomDomain) {
           query = query.eq('custom_domain', currentHost);
+        } else {
+          // For default domains, get pages that either have no custom domain or match the current host
+          query = query.or(`custom_domain.is.null,custom_domain.eq.${currentHost}`);
         }
         
         const { data: page, error: dbError } = await query.maybeSingle();

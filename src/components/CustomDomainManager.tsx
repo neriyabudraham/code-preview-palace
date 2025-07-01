@@ -4,16 +4,18 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, Globe, Copy, ExternalLink, Unlink } from "lucide-react";
+import { AlertCircle, CheckCircle, Globe, Copy, ExternalLink, Unlink, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 export const CustomDomainManager = () => {
-  const [customDomain, setCustomDomain] = useState("");
+  const [subdomain, setSubdomain] = useState("");
+  const [domain, setDomain] = useState("");
   const [currentDomain, setCurrentDomain] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [isCheckingDomain, setIsCheckingDomain] = useState(false);
   const [isDomainVerified, setIsDomainVerified] = useState(false);
   const { toast } = useToast();
   const { user, session } = useAuth();
@@ -47,7 +49,19 @@ export const CustomDomainManager = () => {
         if (profile) {
           setCurrentDomain(profile.custom_domain);
           setIsDomainVerified(profile.domain_verified || false);
-          setCustomDomain(profile.custom_domain || "");
+          
+          // Parse existing domain into subdomain and domain parts
+          if (profile.custom_domain) {
+            const parts = profile.custom_domain.split('.');
+            if (parts.length >= 3) {
+              setSubdomain(parts[0]);
+              setDomain(parts.slice(1).join('.'));
+            } else {
+              setSubdomain('');
+              setDomain(profile.custom_domain);
+            }
+          }
+          
           console.log('Loaded domain config:', profile);
         } else {
           // Profile doesn't exist yet, but that's OK - it will be created when saving domain
@@ -66,6 +80,15 @@ export const CustomDomainManager = () => {
     loadDomainConfig();
   }, [user, session, toast]);
 
+  const getFullDomain = () => {
+    if (subdomain.trim() && domain.trim()) {
+      return `${subdomain.trim()}.${domain.trim()}`;
+    } else if (domain.trim()) {
+      return domain.trim();
+    }
+    return '';
+  };
+
   const handleSaveDomain = async () => {
     if (!user || !session) {
       toast({
@@ -76,7 +99,8 @@ export const CustomDomainManager = () => {
       return;
     }
 
-    if (!customDomain.trim()) {
+    const fullDomain = getFullDomain();
+    if (!fullDomain) {
       toast({
         title: "שגיאה",
         description: "יש להזין דומיין",
@@ -87,7 +111,7 @@ export const CustomDomainManager = () => {
 
     // Improved domain validation that supports subdomains
     const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
-    if (!domainRegex.test(customDomain.trim())) {
+    if (!domainRegex.test(fullDomain)) {
       toast({
         title: "שגיאה",
         description: "פורמט הדומיין לא תקין. דוגמה: example.com או subdomain.example.com",
@@ -99,7 +123,7 @@ export const CustomDomainManager = () => {
     setIsLoading(true);
 
     try {
-      console.log('Saving domain for user:', user.id, 'Domain:', customDomain.trim());
+      console.log('Saving domain for user:', user.id, 'Domain:', fullDomain);
       
       // Use upsert to either insert or update the profile record
       const { error } = await supabase
@@ -107,7 +131,7 @@ export const CustomDomainManager = () => {
         .upsert({
           id: user.id,
           email: user.email,
-          custom_domain: customDomain.trim(),
+          custom_domain: fullDomain,
           domain_verified: false,
           updated_at: new Date().toISOString()
         }, {
@@ -119,7 +143,7 @@ export const CustomDomainManager = () => {
         throw error;
       }
 
-      setCurrentDomain(customDomain.trim());
+      setCurrentDomain(fullDomain);
       setIsDomainVerified(false);
 
       toast({
@@ -144,6 +168,61 @@ export const CustomDomainManager = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCheckDomain = async () => {
+    const fullDomain = getFullDomain();
+    if (!fullDomain || !user) {
+      toast({
+        title: "שגיאה",
+        description: "יש להזין דומיין תקין ולהתחבר למערכת",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsCheckingDomain(true);
+    
+    try {
+      // For now, we'll just refresh the domain status from the database
+      // In a real implementation, you'd check DNS records here
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('domain_verified')
+        .eq('id', user.id)
+        .eq('custom_domain', fullDomain)
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      if (profile) {
+        setIsDomainVerified(profile.domain_verified || false);
+        toast({
+          title: profile.domain_verified ? "דומיין מאומת!" : "דומיין לא מאומת",
+          description: profile.domain_verified 
+            ? "הדומיין שלך מוגדר בהצלחה ופועל" 
+            : "הדומיין עדיין לא מאומת. אנא וודא שהגדרת את רשומת ה-DNS",
+          variant: profile.domain_verified ? "default" : "destructive"
+        });
+      } else {
+        toast({
+          title: "הדומיין לא נמצא",
+          description: "יש לשמור את הדומיין לפני בדיקתו",
+          variant: "destructive"
+        });
+      }
+    } catch (error: any) {
+      console.error('Error checking domain:', error);
+      toast({
+        title: "שגיאה בבדיקת הדומיין",
+        description: "לא ניתן לבדוק את סטטוס הדומיין כרגע",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCheckingDomain(false);
     }
   };
 
@@ -178,7 +257,8 @@ export const CustomDomainManager = () => {
 
       setCurrentDomain(null);
       setIsDomainVerified(false);
-      setCustomDomain("");
+      setSubdomain("");
+      setDomain("");
 
       toast({
         title: "דומיין נותק בהצלחה",
@@ -203,11 +283,11 @@ export const CustomDomainManager = () => {
     }
   };
 
-  const copyDNSRecord = () => {
-    navigator.clipboard.writeText("185.158.133.1");
+  const copyDNSRecord = (text: string) => {
+    navigator.clipboard.writeText(text);
     toast({
       title: "הועתק!",
-      description: "כתובת ה-IP הועתקה ללוח",
+      description: "הטקסט הועתק ללוח",
     });
   };
 
@@ -223,6 +303,8 @@ export const CustomDomainManager = () => {
       </div>
     );
   }
+
+  const fullDomain = getFullDomain();
 
   return (
     <div className="space-y-6">
@@ -276,29 +358,73 @@ export const CustomDomainManager = () => {
           )}
 
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold mb-2 text-slate-300">
-                כתובת הדומיין:
-              </label>
-              <Input
-                value={customDomain}
-                onChange={(e) => setCustomDomain(e.target.value)}
-                placeholder="example.com או page.example.com"
-                className="bg-slate-700 border-slate-600 text-white"
-                dir="ltr"
-              />
-              <p className="text-xs text-slate-400 mt-1">
-                הזן את הדומיין או תת-הדומיין שלך (ללא http:// או https://)
-              </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-300">
+                  תת-דומיין (אופציונלי):
+                </label>
+                <Input
+                  value={subdomain}
+                  onChange={(e) => setSubdomain(e.target.value)}
+                  placeholder="page, www, blog..."
+                  className="bg-slate-700 border-slate-600 text-white"
+                  dir="ltr"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-300">
+                  דומיין עיקרי:
+                </label>
+                <Input
+                  value={domain}
+                  onChange={(e) => setDomain(e.target.value)}
+                  placeholder="example.com"
+                  className="bg-slate-700 border-slate-600 text-white"
+                  dir="ltr"
+                />
+              </div>
             </div>
+            
+            {fullDomain && (
+              <div className="bg-slate-800 rounded-lg p-4 border border-slate-600">
+                <p className="text-sm text-slate-400 mb-2">הדומיין המלא שיוגדר:</p>
+                <div className="flex items-center gap-2">
+                  <code className="text-white font-mono bg-slate-700 px-3 py-2 rounded flex-1">
+                    {fullDomain}
+                  </code>
+                  <Button
+                    onClick={() => copyDNSRecord(fullDomain)}
+                    size="sm"
+                    variant="outline"
+                    className="border-slate-600 text-slate-300 hover:bg-slate-600"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
 
-            <Button
-              onClick={handleSaveDomain}
-              disabled={isLoading || !customDomain.trim()}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-            >
-              {isLoading ? "שומר..." : "שמור דומיין"}
-            </Button>
+            <div className="flex gap-3">
+              <Button
+                onClick={handleSaveDomain}
+                disabled={isLoading || !fullDomain}
+                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              >
+                {isLoading ? "שומר..." : "שמור דומיין"}
+              </Button>
+              
+              {currentDomain && (
+                <Button
+                  onClick={handleCheckDomain}
+                  disabled={isCheckingDomain}
+                  variant="outline"
+                  className="border-green-600 text-green-400 hover:bg-green-900/20"
+                >
+                  <Search className="w-4 h-4 mr-1" />
+                  {isCheckingDomain ? "בודק..." : "בדוק דומיין"}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </Card>
@@ -312,24 +438,43 @@ export const CustomDomainManager = () => {
             </h3>
             
             <div className="bg-slate-800 rounded-lg p-4 border border-slate-600">
-              <p className="text-sm text-slate-300 mb-3">
+              <p className="text-sm text-slate-300 mb-4">
                 להשלמת החיבור, יש להוסיף רשומת A בהגדרות ה-DNS של הדומיין:
               </p>
               
-              <div className="space-y-2">
-                <div className="flex items-center justify-between bg-slate-700 rounded p-3">
-                  <div>
-                    <span className="text-sm text-slate-400">רשומת A:</span>
-                    <code className="block text-white font-mono">{currentDomain} → 185.158.133.1</code>
+              <div className="space-y-3">
+                <div className="grid grid-cols-3 gap-4 text-sm font-semibold text-slate-400 border-b border-slate-600 pb-2">
+                  <div>סוג רשומה</div>
+                  <div>שם מארח</div>
+                  <div>ערך נדרש</div>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-4 items-center">
+                  <div className="bg-slate-700 rounded px-3 py-2 text-white font-mono text-sm">
+                    A
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={copyDNSRecord}
-                    className="border-slate-600 text-slate-300 hover:bg-slate-600"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </Button>
+                  <div className="bg-slate-700 rounded px-3 py-2 text-white font-mono text-sm flex items-center gap-2">
+                    <span className="truncate">{currentDomain}</span>
+                    <Button
+                      onClick={() => copyDNSRecord(currentDomain)}
+                      size="sm"
+                      variant="ghost"
+                      className="p-1 h-6 w-6 hover:bg-slate-600"
+                    >
+                      <Copy size={12} />
+                    </Button>
+                  </div>
+                  <div className="bg-slate-700 rounded px-3 py-2 text-white font-mono text-sm flex items-center gap-2">
+                    <span>185.158.133.1</span>
+                    <Button
+                      onClick={() => copyDNSRecord("185.158.133.1")}
+                      size="sm"
+                      variant="ghost"
+                      className="p-1 h-6 w-6 hover:bg-slate-600"
+                    >
+                      <Copy size={12} />
+                    </Button>
+                  </div>
                 </div>
               </div>
               
@@ -348,6 +493,7 @@ export const CustomDomainManager = () => {
                 </div>
                 <p className="text-sm text-orange-300 mt-2">
                   לאחר הגדרת רשומת ה-DNS, הדפים שלך יהיו זמינים בדומיין החדש תוך מספר שעות.
+                  ניתן ללחוץ על "בדוק דומיין" כדי לבדוק את הסטטוס.
                 </p>
               </div>
             )}

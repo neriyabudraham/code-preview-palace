@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { ExternalLink, Trash2, Globe, Calendar } from "lucide-react";
+import { ExternalLink, Trash2, Globe, Calendar, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -151,6 +151,14 @@ export const PublishedPagesManager = () => {
     return `https://code-preview-palace.lovable.app/${page.slug}`;
   };
 
+  const copyUrl = (url: string) => {
+    navigator.clipboard.writeText(url);
+    toast({
+      title: "הועתק! 📋",
+      description: "הקישור הועתק ללוח",
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -194,86 +202,99 @@ export const PublishedPagesManager = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {publishedPages.map((page) => (
-          <Card key={page.id} className="bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800 border-slate-700 hover:shadow-xl transition-all duration-300">
-            <div className="p-5 space-y-4">
-              <div>
-                <h3 className="font-bold text-white text-lg mb-1 truncate">{page.title}</h3>
-                <div className="flex items-center gap-2 text-sm">
-                  <Globe size={14} className="text-emerald-400" />
-                  <span className="text-emerald-400 font-mono">/{page.slug}</span>
+        {publishedPages.map((page) => {
+          const fullUrl = getPublishedUrl(page);
+          return (
+            <Card key={page.id} className="bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800 border-slate-700 hover:shadow-xl transition-all duration-300">
+              <div className="p-5 space-y-4">
+                <div>
+                  <h3 className="font-bold text-white text-lg mb-2 truncate">{page.title}</h3>
+                  <div className="flex items-center gap-2 text-sm mb-2">
+                    <Globe size={14} className="text-emerald-400 flex-shrink-0" />
+                    <span className="text-emerald-400 font-mono text-xs truncate" title={fullUrl}>
+                      {fullUrl}
+                    </span>
+                    <Button
+                      onClick={() => copyUrl(fullUrl)}
+                      size="sm"
+                      variant="ghost"
+                      className="p-1 h-6 w-6 hover:bg-slate-700"
+                    >
+                      <Copy size={12} />
+                    </Button>
+                  </div>
                   {page.custom_domain && (
-                    <Badge variant="outline" className="text-xs border-blue-400 text-blue-400">
+                    <Badge variant="outline" className="text-xs border-blue-400 text-blue-400 mb-2">
                       דומיין מותאם
                     </Badge>
                   )}
                 </div>
-              </div>
-              
-              <div className="text-xs text-slate-500 space-y-1">
-                <div className="flex items-center gap-1">
-                  <Calendar size={12} />
-                  <span>פורסם: {formatDate(page.created_at)}</span>
-                </div>
-                {page.updated_at !== page.created_at && (
+                
+                <div className="text-xs text-slate-500 space-y-1">
                   <div className="flex items-center gap-1">
                     <Calendar size={12} />
-                    <span>עודכן: {formatDate(page.updated_at)}</span>
+                    <span>פורסם: {formatDate(page.created_at)}</span>
                   </div>
-                )}
-              </div>
-              
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => window.open(getPublishedUrl(page), '_blank')}
-                  className="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg transition-all duration-200 font-semibold"
-                >
-                  <ExternalLink size={14} className="mr-1" />
-                  פתח
-                </Button>
+                  {page.updated_at !== page.created_at && (
+                    <div className="flex items-center gap-1">
+                      <Calendar size={12} />
+                      <span>עודכן: {formatDate(page.updated_at)}</span>
+                    </div>
+                  )}
+                </div>
                 
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button 
-                      size="sm" 
-                      variant="destructive" 
-                      className="px-3"
-                      disabled={deletingPageId === page.id}
-                    >
-                      {deletingPageId === page.id ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      ) : (
-                        <Trash2 size={14} />
-                      )}
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="bg-slate-800 border-slate-700">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle className="text-white">מחיקת דף מפורסם</AlertDialogTitle>
-                      <AlertDialogDescription className="text-slate-400">
-                        האם אתה בטוח שברצונך למחוק את הדף "{page.title}" מהפרסום? 
-                        הדף לא יהיה זמין יותר בכתובת /{page.slug} ותוכל להשתמש בסלאג הזה שוב בעתיד.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600">
-                        ביטול
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => deletePage(page.id, page.slug, page.title)}
-                        className="bg-red-600 hover:bg-red-700"
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => window.open(fullUrl, '_blank')}
+                    className="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg transition-all duration-200 font-semibold"
+                  >
+                    <ExternalLink size={14} className="mr-1" />
+                    פתח
+                  </Button>
+                  
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        size="sm" 
+                        variant="destructive" 
+                        className="px-3"
                         disabled={deletingPageId === page.id}
                       >
-                        {deletingPageId === page.id ? "מוחק..." : "מחק"}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                        {deletingPageId === page.id ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        ) : (
+                          <Trash2 size={14} />
+                        )}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-slate-800 border-slate-700">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-white">מחיקת דף מפורסם</AlertDialogTitle>
+                        <AlertDialogDescription className="text-slate-400">
+                          האם אתה בטוח שברצונך למחוק את הדף "{page.title}" מהפרסום? 
+                          הדף לא יהיה זמין יותר בכתובת /{page.slug} ותוכל להשתמש בסלאג הזה שוב בעתיד.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600">
+                          ביטול
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => deletePage(page.id, page.slug, page.title)}
+                          className="bg-red-600 hover:bg-red-700"
+                          disabled={deletingPageId === page.id}
+                        >
+                          {deletingPageId === page.id ? "מוחק..." : "מחק"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

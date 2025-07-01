@@ -7,6 +7,7 @@ import { HtmlPreview } from "./HtmlPreview";
 import { PublishDialog } from "./PublishDialog";
 import { Save, Play, RotateCcw, Copy, Share2, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 const EMPTY_HTML = `<!DOCTYPE html>
 <html lang="he" dir="rtl">
@@ -102,10 +103,18 @@ export const HtmlEditor = () => {
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [lastSavedProject, setLastSavedProject] = useState<any>(null);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const [isProjectPublished, setIsProjectPublished] = useState(false);
   const { toast } = useToast();
   
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef<string>("");
+
+  // Check if current project is published
+  const checkIfProjectIsPublished = useCallback((projectId: string) => {
+    const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
+    const project = savedProjects.find((p: any) => p.id === projectId);
+    return project && (project.publishedUrl || project.customSlug);
+  }, []);
 
   // Save editor state to localStorage
   const saveEditorState = useCallback(() => {
@@ -183,6 +192,9 @@ export const HtmlEditor = () => {
             html: htmlCode,
             updatedAt: now,
           };
+          
+          // Check if project is published
+          setIsProjectPublished(checkIfProjectIsPublished(currentProjectId));
         }
       } else {
         // Create new project for auto-save
@@ -198,6 +210,7 @@ export const HtmlEditor = () => {
         savedProjects.push(project);
         setCurrentProjectId(project.id);
         setIsEditingExisting(true);
+        setIsProjectPublished(false);
       }
 
       localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
@@ -215,7 +228,7 @@ export const HtmlEditor = () => {
     } finally {
       setIsAutoSaving(false);
     }
-  }, [htmlCode, fileName, currentProjectId, isEditingExisting, isSampleMode, toast]);
+  }, [htmlCode, fileName, currentProjectId, isEditingExisting, isSampleMode, toast, checkIfProjectIsPublished]);
 
   // Set up auto-save when content changes
   useEffect(() => {
@@ -254,6 +267,7 @@ export const HtmlEditor = () => {
         setIsEditingExisting(true);
         setIsSampleMode(false);
         setLastSavedProject(project);
+        setIsProjectPublished(checkIfProjectIsPublished(project.id));
         lastSavedContentRef.current = project.html;
         // Clear the sessionStorage after loading
         sessionStorage.removeItem("editingProject");
@@ -278,6 +292,7 @@ export const HtmlEditor = () => {
         setCurrentProjectId(editorState.currentProjectId);
         setIsEditingExisting(editorState.isEditingExisting);
         setIsSampleMode(false);
+        setIsProjectPublished(checkIfProjectIsPublished(editorState.currentProjectId));
         lastSavedContentRef.current = editorState.htmlCode;
         
         // Find the project for publish functionality
@@ -300,7 +315,8 @@ export const HtmlEditor = () => {
     setIsEditingExisting(false);
     setIsSampleMode(true);
     setLastSavedProject(null);
-  }, [toast]);
+    setIsProjectPublished(false);
+  }, [toast, checkIfProjectIsPublished]);
 
   const handleCodeChange = (newCode: string) => {
     if (isSampleMode) {
@@ -326,6 +342,7 @@ export const HtmlEditor = () => {
     setIsEditingExisting(false);
     setIsSampleMode(false);
     setLastSavedProject(null);
+    setIsProjectPublished(false);
     lastSavedContentRef.current = "";
     localStorage.removeItem("editorState");
     toast({
@@ -361,6 +378,7 @@ export const HtmlEditor = () => {
     const savedProject = savedProjects.find((p: any) => p.id === currentProjectId || (p.name === fileName && p.html === htmlCode));
     if (savedProject) {
       setLastSavedProject(savedProject);
+      setIsProjectPublished(checkIfProjectIsPublished(savedProject.id));
     }
     
     toast({
@@ -384,6 +402,7 @@ export const HtmlEditor = () => {
     setCurrentProjectId(null);
     setIsEditingExisting(false);
     setLastSavedProject(null);
+    setIsProjectPublished(false);
     lastSavedContentRef.current = "";
     
     toast({
@@ -399,6 +418,7 @@ export const HtmlEditor = () => {
     setIsEditingExisting(false);
     setIsSampleMode(true);
     setLastSavedProject(null);
+    setIsProjectPublished(false);
     lastSavedContentRef.current = "";
     localStorage.removeItem("editorState");
     toast({
@@ -417,6 +437,13 @@ export const HtmlEditor = () => {
       return;
     }
     setShowPublishDialog(true);
+  };
+
+  const getPublishButtonText = () => {
+    if (isProjectPublished) {
+      return "פרסום מחדש";
+    }
+    return "פרסום";
   };
 
   return (
@@ -470,7 +497,7 @@ export const HtmlEditor = () => {
               disabled={!lastSavedProject}
             >
               <Share2 size={18} className="mr-2" />
-              פרסום
+              {getPublishButtonText()}
             </Button>
           )}
           
@@ -498,6 +525,11 @@ export const HtmlEditor = () => {
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
                 🔄 שמירה אוטומטית פעילה - השינויים נשמרים אוטומטיים
+                {isProjectPublished && (
+                  <Badge variant="outline" className="mr-2 border-orange-400 text-orange-400">
+                    מפורסם
+                  </Badge>
+                )}
               </div>
             </div>
           )}
