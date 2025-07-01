@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +26,22 @@ export const HtmlEditor = () => {
   
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef<string>("");
+
+  // Generate default filename with automatic numbering
+  const generateDefaultFileName = useCallback(() => {
+    const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
+    let baseName = "דף חדש";
+    let counter = 1;
+    let finalName = baseName;
+
+    // Check if name exists and increment counter
+    while (savedProjects.some((p: any) => p.name === finalName && p.id !== currentProjectId)) {
+      finalName = `${baseName} ${counter}`;
+      counter++;
+    }
+
+    return finalName;
+  }, [currentProjectId]);
 
   // Check if current project is published
   const checkIfProjectIsPublished = useCallback((projectId: string) => {
@@ -83,9 +98,8 @@ export const HtmlEditor = () => {
 
   // Auto-save function
   const autoSave = useCallback(async () => {
-    if (!fileName.trim()) {
-      return;
-    }
+    // Use default filename if no filename is provided
+    const finalFileName = fileName.trim() || generateDefaultFileName();
 
     // Don't auto-save if content hasn't changed
     if (lastSavedContentRef.current === htmlCode) {
@@ -94,7 +108,7 @@ export const HtmlEditor = () => {
 
     // Check for duplicate names
     const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
-    const existingProject = savedProjects.find((p: any) => p.name === fileName && p.id !== currentProjectId);
+    const existingProject = savedProjects.find((p: any) => p.name === finalFileName && p.id !== currentProjectId);
     
     if (existingProject) {
       toast({
@@ -139,7 +153,7 @@ export const HtmlEditor = () => {
           // Update current project
           savedProjects[projectIndex] = {
             ...existingProject,
-            name: fileName,
+            name: finalFileName,
             html: htmlCode,
             updatedAt: now,
           };
@@ -151,7 +165,7 @@ export const HtmlEditor = () => {
         // Create new project for auto-save
         const project = {
           id: Date.now().toString(),
-          name: fileName,
+          name: finalFileName,
           html: htmlCode,
           createdAt: now,
           updatedAt: now,
@@ -168,13 +182,18 @@ export const HtmlEditor = () => {
       lastSavedContentRef.current = htmlCode;
       setHasUnsavedChanges(false);
       
+      // Update filename if it was empty and we used default
+      if (!fileName.trim()) {
+        setFileName(finalFileName);
+      }
+      
       // Clear draft and temp work after successful save
       localStorage.removeItem("editorDraft");
       localStorage.removeItem("tempEditorWork");
       setCurrentDraft(null);
       
       // Set last saved project for publish functionality
-      const currentProject = savedProjects.find((p: any) => p.id === currentProjectId || (p.name === fileName && p.html === htmlCode));
+      const currentProject = savedProjects.find((p: any) => p.id === currentProjectId || (p.name === finalFileName && p.html === htmlCode));
       if (currentProject) {
         setLastSavedProject(currentProject);
       }
@@ -185,7 +204,7 @@ export const HtmlEditor = () => {
     } finally {
       setIsAutoSaving(false);
     }
-  }, [htmlCode, fileName, currentProjectId, isEditingExisting, toast, checkIfProjectIsPublished]);
+  }, [htmlCode, fileName, currentProjectId, isEditingExisting, toast, checkIfProjectIsPublished, generateDefaultFileName]);
 
   // Track changes to mark unsaved changes
   useEffect(() => {
@@ -345,21 +364,33 @@ export const HtmlEditor = () => {
   };
 
   const handleSave = async () => {
-    if (!fileName.trim()) {
+    // Use default filename if no filename is provided
+    const finalFileName = fileName.trim() || generateDefaultFileName();
+    
+    // Check for duplicate names before saving
+    const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
+    const existingProject = savedProjects.find((p: any) => p.name === finalFileName && p.id !== currentProjectId);
+    
+    if (existingProject) {
       toast({
-        title: "שגיאה",
-        description: "אנא הזן שם לקובץ",
+        title: "שם כבר קיים",
+        description: "פרויקט עם השם הזה כבר קיים. אנא בחר שם אחר.",
         variant: "destructive",
       });
       return;
     }
 
-    // Force immediate save - removed HTML content check
+    // Update filename if it was empty and we're using default
+    if (!fileName.trim()) {
+      setFileName(finalFileName);
+    }
+
+    // Force immediate save
     await autoSave();
     
     // Make sure the project is available for publishing immediately after save
-    const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
-    const savedProject = savedProjects.find((p: any) => p.id === currentProjectId || (p.name === fileName && p.html === htmlCode));
+    const updatedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
+    const savedProject = updatedProjects.find((p: any) => p.id === currentProjectId || (p.name === finalFileName && p.html === htmlCode));
     if (savedProject) {
       setLastSavedProject(savedProject);
       setIsProjectPublished(checkIfProjectIsPublished(savedProject.id));
@@ -367,7 +398,7 @@ export const HtmlEditor = () => {
     
     toast({
       title: "נשמר בהצלחה!",
-      description: `הקובץ "${fileName}" נשמר`,
+      description: `הקובץ "${finalFileName}" נשמר`,
     });
   };
 
@@ -422,9 +453,9 @@ export const HtmlEditor = () => {
     return "פרסום";
   };
 
-  // Fixed save button logic - check for both filename AND html content
-  const canSave = fileName.trim() && htmlCode.trim();
-  const canPublish = fileName.trim() && lastSavedProject;
+  // Save button is always enabled - validation happens on click
+  const canSave = true;
+  const canPublish = lastSavedProject;
 
   return (
     <div className="space-y-6">
@@ -435,7 +466,7 @@ export const HtmlEditor = () => {
             <Input
               value={fileName}
               onChange={(e) => handleFileNameChange(e.target.value)}
-              placeholder="שם הקובץ..."
+              placeholder="שם הקובץ (יווצר שם אוטומטי אם לא יוזן)..."
               className="pr-12 bg-slate-800/70 border-slate-600 text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 h-12 text-lg"
             />
           </div>
@@ -462,7 +493,7 @@ export const HtmlEditor = () => {
           <Button 
             onClick={handleSave} 
             className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 border-0 text-white shadow-lg hover:shadow-xl transition-all duration-200 h-12 px-8 font-semibold text-base" 
-            disabled={!canSave || isAutoSaving}
+            disabled={isAutoSaving}
           >
             <Save size={18} className="mr-2" />
             {isAutoSaving ? "שומר..." : "שמור"}
@@ -522,7 +553,7 @@ export const HtmlEditor = () => {
         )}
         
         <div className="flex gap-2">
-          {fileName.trim() && (
+          {(fileName.trim() || htmlCode.trim()) && (
             <div className="bg-emerald-900/40 border border-emerald-700/50 rounded-xl p-4 text-emerald-200 text-sm flex-1 backdrop-blur-sm">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
