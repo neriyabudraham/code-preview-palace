@@ -71,6 +71,15 @@ export const PublishedPagesManager = () => {
   };
 
   const saveProjectFromPublished = async (page: PublishedPage) => {
+    if (!user) {
+      toast({
+        title: "שגיאה",
+        description: "יש להתחבר כדי לשמור פרויקטים",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       // Get the HTML content from the published page
       const { data, error } = await supabase
@@ -83,19 +92,21 @@ export const PublishedPagesManager = () => {
         throw error;
       }
 
-      // Save to localStorage as a new project
-      const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
+      // Save to localStorage as a new project with user-specific key
+      const userProjectsKey = `htmlProjects_${user.id}`;
+      const savedProjects = JSON.parse(localStorage.getItem(userProjectsKey) || "[]");
       const newProject = {
         id: Date.now().toString(),
         name: `${page.title} (שוחזר)`,
         html: data.html_content,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        versions: []
+        versions: [],
+        userId: user.id // Add user ID to the project
       };
 
       savedProjects.push(newProject);
-      localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
+      localStorage.setItem(userProjectsKey, JSON.stringify(savedProjects));
 
       toast({
         title: "פרויקט נשמר!",
@@ -139,24 +150,27 @@ export const PublishedPagesManager = () => {
         return updated;
       });
       
-      // Update localStorage projects - remove publication data
+      // Update localStorage projects - remove publication data (user-specific)
       try {
-        const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
-        console.log('Current localStorage projects:', savedProjects);
-        
-        const updatedProjects = savedProjects.map((project: any) => {
-          // Check if this project matches the deleted page
-          if (project.customSlug === slug || project.publishedUrl?.includes(slug)) {
-            console.log(`Removing publication data from project: ${project.name || project.id}`);
-            // Remove publication-related fields
-            const { publishedUrl, customSlug, publishedAt, ...cleanProject } = project;
-            return cleanProject;
-          }
-          return project;
-        });
-        
-        localStorage.setItem("htmlProjects", JSON.stringify(updatedProjects));
-        console.log('Updated localStorage projects:', updatedProjects);
+        if (user) {
+          const userProjectsKey = `htmlProjects_${user.id}`;
+          const savedProjects = JSON.parse(localStorage.getItem(userProjectsKey) || "[]");
+          console.log('Current localStorage projects:', savedProjects);
+          
+          const updatedProjects = savedProjects.map((project: any) => {
+            // Check if this project matches the deleted page
+            if (project.customSlug === slug || project.publishedUrl?.includes(slug)) {
+              console.log(`Removing publication data from project: ${project.name || project.id}`);
+              // Remove publication-related fields
+              const { publishedUrl, customSlug, publishedAt, ...cleanProject } = project;
+              return cleanProject;
+            }
+            return project;
+          });
+          
+          localStorage.setItem(userProjectsKey, JSON.stringify(updatedProjects));
+          console.log('Updated localStorage projects:', updatedProjects);
+        }
       } catch (localStorageError) {
         console.error('Error updating localStorage:', localStorageError);
         // Don't fail the operation if localStorage update fails

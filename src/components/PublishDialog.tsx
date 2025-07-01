@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -284,7 +285,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
       // Generate the URL - use custom domain if available, otherwise use default
       const url = userDomain 
         ? `https://${userDomain}/${slug}` 
-        : `https://code-preview-palace.lovable.app/${slug}`;
+        : `https://html-to-site.lovable.app/${slug}`;
       setPublishedUrl(url);
       
       // Update project in localStorage
@@ -421,7 +422,7 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
                   </label>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-600 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-lg border">
-                      https://{userDomain || 'code-preview-palace.lovable.app'}/
+                      https://{userDomain || 'html-to-site.lovable.app'}/
                     </span>
                     <Input 
                       value={customSlug} 

@@ -23,7 +23,7 @@ export const PublishedPageViewer = () => {
         
         // Get the current hostname to check if it's a custom domain
         const currentHost = window.location.hostname;
-        const isCustomDomain = currentHost !== 'code-preview-palace.lovable.app' && 
+        const isCustomDomain = currentHost !== 'html-to-site.lovable.app' && 
                               currentHost !== 'page.neriyabudraham.co.il' &&
                               currentHost !== 'localhost' && 
                               currentHost !== '127.0.0.1';
