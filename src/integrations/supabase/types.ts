@@ -75,6 +75,53 @@ export type Database = {
         }
         Relationships: []
       }
+      user_projects: {
+        Row: {
+          created_at: string
+          html_content: string
+          id: string
+          is_draft: boolean
+          is_published: boolean
+          name: string
+          project_id: string
+          published_page_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          html_content: string
+          id?: string
+          is_draft?: boolean
+          is_published?: boolean
+          name: string
+          project_id: string
+          published_page_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          html_content?: string
+          id?: string
+          is_draft?: boolean
+          is_published?: boolean
+          name?: string
+          project_id?: string
+          published_page_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_projects_published_page_id_fkey"
+            columns: ["published_page_id"]
+            isOneToOne: false
+            referencedRelation: "published_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

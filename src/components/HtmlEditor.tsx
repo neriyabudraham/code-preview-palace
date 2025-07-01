@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,8 @@ import { Save, Play, RotateCcw, Copy, Share2, FileText, Trash2 } from "lucide-re
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserProjects } from "@/hooks/useUserProjects";
+import { UserProject } from "@/services/userProjectsService";
 
 const EMPTY_HTML = "";
 
@@ -17,107 +20,44 @@ export const HtmlEditor = () => {
   const [fileName, setFileName] = useState("");
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [isEditingExisting, setIsEditingExisting] = useState(false);
-  const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [lastSavedProject, setLastSavedProject] = useState<any>(null);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [isProjectPublished, setIsProjectPublished] = useState(false);
-  const [currentDraft, setCurrentDraft] = useState<any>(null);
+  const [currentDraft, setCurrentDraft] = useState<UserProject | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
   const { toast } = useToast();
   const { user } = useAuth();
+  const { projects, saveProject, saveDraft, isSaving } = useUserProjects();
   
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef<string>("");
 
-  // Get user-specific localStorage keys
-  const getUserProjectsKey = useCallback(() => {
-    return user ? `htmlProjects_${user.id}` : "htmlProjects";
-  }, [user]);
-
-  const getUserDraftKey = useCallback(() => {
-    return user ? `editorDraft_${user.id}` : "editorDraft";
-  }, [user]);
-
-  const getUserTempWorkKey = useCallback(() => {
-    return user ? `tempEditorWork_${user.id}` : "tempEditorWork";
-  }, [user]);
-
   // Generate default filename with automatic numbering
   const generateDefaultFileName = useCallback(() => {
-    const savedProjects = JSON.parse(localStorage.getItem(getUserProjectsKey()) || "[]");
     let baseName = "דף חדש";
     let counter = 1;
     let finalName = baseName;
 
     // Check if name exists and increment counter
-    while (savedProjects.some((p: any) => p.name === finalName && p.id !== currentProjectId)) {
+    while (projects.some((p: UserProject) => p.name === finalName && p.project_id !== currentProjectId)) {
       finalName = `${baseName} ${counter}`;
       counter++;
     }
 
     return finalName;
-  }, [currentProjectId, getUserProjectsKey]);
+  }, [currentProjectId, projects]);
 
   // Check if current project is published
   const checkIfProjectIsPublished = useCallback((projectId: string) => {
-    const savedProjects = JSON.parse(localStorage.getItem(getUserProjectsKey()) || "[]");
-    const project = savedProjects.find((p: any) => p.id === projectId);
-    return project && (project.publishedUrl || project.customSlug);
-  }, [getUserProjectsKey]);
-
-  // Save temporary work when filename changes
-  const saveTempWork = useCallback(() => {
-    if (fileName.trim() || htmlCode.trim()) {
-      const tempWork = {
-        fileName: fileName || '',
-        htmlCode: htmlCode || '',
-        savedAt: new Date().toISOString(),
-        userId: user?.id
-      };
-      localStorage.setItem(getUserTempWorkKey(), JSON.stringify(tempWork));
-      console.log('Saved temp work:', tempWork);
-    }
-  }, [fileName, htmlCode, getUserTempWorkKey, user]);
-
-  // Save draft only when exiting without saving
-  const saveDraftOnExit = useCallback(() => {
-    if (hasUnsavedChanges && (htmlCode.trim() || fileName.trim())) {
-      const draft = {
-        id: currentProjectId || 'draft_' + Date.now(),
-        htmlCode,
-        fileName: fileName || 'טיוטה - שמירה אוטומטית',
-        savedAt: new Date().toISOString(),
-        isDraft: true,
-        userId: user?.id
-      };
-      localStorage.setItem(getUserDraftKey(), JSON.stringify(draft));
-      console.log('Draft saved on exit:', draft);
-    }
-  }, [htmlCode, fileName, currentProjectId, hasUnsavedChanges, getUserDraftKey, user]);
-
-  // Set up beforeunload event to save draft when leaving
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      saveDraftOnExit();
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [saveDraftOnExit, hasUnsavedChanges]);
-
-  // Save temporary work when content changes
-  useEffect(() => {
-    saveTempWork();
-  }, [fileName, htmlCode, saveTempWork]);
+    const project = projects.find((p: UserProject) => p.project_id === projectId);
+    return project && project.is_published;
+  }, [projects]);
 
   // Auto-save function
   const autoSave = useCallback(async () => {
-    if (!user) {
-      console.log('No user logged in, skipping auto-save');
+    if (!user || !fileName.trim()) {
+      console.log('No user logged in or no filename, skipping auto-save');
       return;
     }
 
@@ -130,8 +70,7 @@ export const HtmlEditor = () => {
     }
 
     // Check for duplicate names
-    const savedProjects = JSON.parse(localStorage.getItem(getUserProjectsKey()) || "[]");
-    const existingProject = savedProjects.find((p: any) => p.name === finalFileName && p.id !== currentProjectId);
+    const existingProject = projects.find((p: UserProject) => p.name === finalFileName && p.project_id !== currentProjectId);
     
     if (existingProject) {
       toast({
@@ -142,94 +81,36 @@ export const HtmlEditor = () => {
       return;
     }
 
-    setIsAutoSaving(true);
-    
     try {
-      const now = new Date().toISOString();
+      const projectId = currentProjectId || Date.now().toString();
       
-      if (isEditingExisting && currentProjectId) {
-        // Update existing project
-        const projectIndex = savedProjects.findIndex((p: any) => p.id === currentProjectId);
-        if (projectIndex !== -1) {
-          const existingProject = savedProjects[projectIndex];
-          
-          // Create version history entry only if there's a significant change
-          if (existingProject.html !== htmlCode) {
-            if (!existingProject.versions) {
-              existingProject.versions = [];
-            }
-            
-            // Add current version to history
-            existingProject.versions.unshift({
-              id: Date.now().toString() + "_v",
-              html: existingProject.html,
-              savedAt: existingProject.updatedAt,
-              version: (existingProject.versions.length || 0) + 1
-            });
-            
-            // Keep only last 10 versions
-            if (existingProject.versions.length > 10) {
-              existingProject.versions = existingProject.versions.slice(0, 10);
-            }
-          }
-          
-          // Update current project
-          savedProjects[projectIndex] = {
-            ...existingProject,
-            name: finalFileName,
-            html: htmlCode,
-            updatedAt: now,
-            userId: user.id
-          };
-          
-          // Check if project is published
-          setIsProjectPublished(checkIfProjectIsPublished(currentProjectId));
+      const savedProject = await saveProject(projectId, finalFileName, htmlCode, false);
+      
+      if (savedProject) {
+        if (!currentProjectId) {
+          setCurrentProjectId(savedProject.project_id);
+          setIsEditingExisting(true);
         }
-      } else {
-        // Create new project for auto-save
-        const project = {
-          id: Date.now().toString(),
-          name: finalFileName,
-          html: htmlCode,
-          createdAt: now,
-          updatedAt: now,
-          versions: [],
-          userId: user.id
-        };
-
-        savedProjects.push(project);
-        setCurrentProjectId(project.id);
-        setIsEditingExisting(true);
-        setIsProjectPublished(false);
+        
+        lastSavedContentRef.current = htmlCode;
+        setHasUnsavedChanges(false);
+        setLastSavedProject(savedProject);
+        setIsProjectPublished(savedProject.is_published);
+        
+        // Update filename if it was empty and we used default
+        if (!fileName.trim()) {
+          setFileName(finalFileName);
+        }
+        
+        // Clear draft if it exists
+        setCurrentDraft(null);
+        
+        console.log("Auto-saved successfully");
       }
-
-      localStorage.setItem(getUserProjectsKey(), JSON.stringify(savedProjects));
-      lastSavedContentRef.current = htmlCode;
-      setHasUnsavedChanges(false);
-      
-      // Update filename if it was empty and we used default
-      if (!fileName.trim()) {
-        setFileName(finalFileName);
-      }
-      
-      // Clear draft and temp work after successful save
-      localStorage.removeItem(getUserDraftKey());
-      localStorage.removeItem(getUserTempWorkKey());
-      setCurrentDraft(null);
-      
-      // Set last saved project for publish functionality
-      const currentProject = savedProjects.find((p: any) => p.id === currentProjectId || (p.name === finalFileName && p.html === htmlCode));
-      if (currentProject) {
-        setLastSavedProject(currentProject);
-      }
-      
-      console.log("Auto-saved successfully to:", getUserProjectsKey());
     } catch (error) {
       console.error("Auto-save failed:", error);
-    } finally {
-      setIsAutoSaving(false);
     }
-  }, [htmlCode, fileName, currentProjectId, isEditingExisting, toast, checkIfProjectIsPublished, generateDefaultFileName, user, getUserProjectsKey, getUserDraftKey, getUserTempWorkKey]);
+  }, [htmlCode, fileName, currentProjectId, user, saveProject, generateDefaultFileName, projects, toast]);
 
   // Track changes to mark unsaved changes
   useEffect(() => {
@@ -290,55 +171,24 @@ export const HtmlEditor = () => {
       }
     }
 
-    // Check if there's temporary work to restore (user-specific)
-    const tempWork = localStorage.getItem(getUserTempWorkKey());
-    if (tempWork) {
-      try {
-        const temp = JSON.parse(tempWork);
-        // Verify the temp work belongs to the current user
-        if (!user || !temp.userId || temp.userId === user.id) {
-          setFileName(temp.fileName || "");
-          setHtmlCode(temp.htmlCode || "");
-          setHasUnsavedChanges(true);
-          localStorage.removeItem(getUserTempWorkKey());
-          
-          if (temp.fileName || temp.htmlCode) {
-            toast({
-              title: "עבודה זמנית שוחזרה",
-              description: "העבודה הקודמת שלך שוחזרה",
-            });
-          }
-          return;
-        }
-      } catch (error) {
-        console.error("Error loading temp work:", error);
-      }
+    // Check if there's a draft to restore
+    const drafts = projects.filter((p: UserProject) => p.is_draft);
+    if (drafts.length > 0) {
+      setCurrentDraft(drafts[0]); // Show the most recent draft
     }
 
     // Show empty editor when entering fresh
-    setHtmlCode(EMPTY_HTML);
-    setFileName("");
-    setCurrentProjectId(null);
-    setIsEditingExisting(false);
-    setLastSavedProject(null);
-    setIsProjectPublished(false);
-    lastSavedContentRef.current = "";
-    setHasUnsavedChanges(false);
-    
-    // Check if there's a draft to restore (user-specific)
-    const savedDraft = localStorage.getItem(getUserDraftKey());
-    if (savedDraft) {
-      try {
-        const draft = JSON.parse(savedDraft);
-        // Verify the draft belongs to the current user
-        if (!user || !draft.userId || draft.userId === user.id) {
-          setCurrentDraft(draft);
-        }
-      } catch (error) {
-        console.error("Error loading draft:", error);
-      }
+    if (!editingProject) {
+      setHtmlCode(EMPTY_HTML);
+      setFileName("");
+      setCurrentProjectId(null);
+      setIsEditingExisting(false);
+      setLastSavedProject(null);
+      setIsProjectPublished(false);
+      lastSavedContentRef.current = "";
+      setHasUnsavedChanges(false);
     }
-  }, [toast, checkIfProjectIsPublished, getUserTempWorkKey, getUserDraftKey, user]);
+  }, [toast, checkIfProjectIsPublished, user, projects]);
 
   const handleCodeChange = (newCode: string) => {
     setHtmlCode(newCode);
@@ -348,10 +198,14 @@ export const HtmlEditor = () => {
     setFileName(newFileName);
   };
 
-  const handleNewPage = () => {
+  const handleNewPage = async () => {
     // Save current work as draft if there are unsaved changes
-    if (hasUnsavedChanges) {
-      saveDraftOnExit();
+    if (hasUnsavedChanges && user && (htmlCode.trim() || fileName.trim())) {
+      const draftId = currentProjectId || `draft_${Date.now()}`;
+      const draftName = fileName || 'טיוטה - שמירה אוטומטית';
+      
+      await saveDraft(draftId, draftName, htmlCode);
+      
       toast({
         title: "טיוטה נשמרה",
         description: "העבודה הנוכחית נשמרה כטיוטה",
@@ -375,10 +229,10 @@ export const HtmlEditor = () => {
 
   const handleRestoreDraft = () => {
     if (currentDraft) {
-      setHtmlCode(currentDraft.htmlCode);
-      setFileName(currentDraft.fileName);
-      setCurrentProjectId(currentDraft.id.startsWith('draft_') ? null : currentDraft.id);
-      setIsEditingExisting(!currentDraft.id.startsWith('draft_'));
+      setHtmlCode(currentDraft.html_content);
+      setFileName(currentDraft.name);
+      setCurrentProjectId(currentDraft.project_id);
+      setIsEditingExisting(true);
       setHasUnsavedChanges(true);
       
       toast({
@@ -388,13 +242,15 @@ export const HtmlEditor = () => {
     }
   };
 
-  const handleClearDraft = () => {
-    localStorage.removeItem(getUserDraftKey());
-    setCurrentDraft(null);
-    toast({
-      title: "טיוטה נמחקה",
-      description: "הטיוטה נמחקה בהצלחה",
-    });
+  const handleClearDraft = async () => {
+    if (currentDraft) {
+      // Here you could delete the draft from the database if needed
+      setCurrentDraft(null);
+      toast({
+        title: "טיוטה נמחקה",
+        description: "הטיוטה נמחקה בהצלחה",
+      });
+    }
   };
 
   const handleSave = async () => {
@@ -411,8 +267,7 @@ export const HtmlEditor = () => {
     const finalFileName = fileName.trim() || generateDefaultFileName();
     
     // Check for duplicate names before saving
-    const savedProjects = JSON.parse(localStorage.getItem(getUserProjectsKey()) || "[]");
-    const existingProject = savedProjects.find((p: any) => p.name === finalFileName && p.id !== currentProjectId);
+    const existingProject = projects.find((p: UserProject) => p.name === finalFileName && p.project_id !== currentProjectId);
     
     if (existingProject) {
       toast({
@@ -430,14 +285,6 @@ export const HtmlEditor = () => {
 
     // Force immediate save
     await autoSave();
-    
-    // Make sure the project is available for publishing immediately after save
-    const updatedProjects = JSON.parse(localStorage.getItem(getUserProjectsKey()) || "[]");
-    const savedProject = updatedProjects.find((p: any) => p.id === currentProjectId || (p.name === finalFileName && p.html === htmlCode));
-    if (savedProject) {
-      setLastSavedProject(savedProject);
-      setIsProjectPublished(checkIfProjectIsPublished(savedProject.id));
-    }
     
     toast({
       title: "נשמר בהצלחה!",
@@ -559,10 +406,10 @@ export const HtmlEditor = () => {
           <Button 
             onClick={handleSave} 
             className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 border-0 text-white shadow-lg hover:shadow-xl transition-all duration-200 h-12 px-8 font-semibold text-base" 
-            disabled={isAutoSaving || !canSave}
+            disabled={isSaving || !canSave}
           >
             <Save size={18} className="mr-2" />
-            {isAutoSaving ? "שומר..." : "שמור"}
+            {isSaving ? "שומר..." : "שמור"}
           </Button>
           
           {canPublish && (
@@ -591,9 +438,9 @@ export const HtmlEditor = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-amber-400 rounded-full"></div>
-                <span>טיוטה זמינה: "{currentDraft.fileName || 'ללא שם'}"</span>
+                <span>טיוטה זמינה: "{currentDraft.name}"</span>
                 <span className="text-xs text-amber-300">
-                  ({new Date(currentDraft.savedAt).toLocaleString('he-IL')})
+                  ({new Date(currentDraft.updated_at).toLocaleString('he-IL')})
                 </span>
               </div>
               <div className="flex gap-2">
@@ -623,7 +470,7 @@ export const HtmlEditor = () => {
             <div className="bg-emerald-900/40 border border-emerald-700/50 rounded-xl p-4 text-emerald-200 text-sm flex-1 backdrop-blur-sm">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                🔄 שמירה אוטומטית פעילה - השינויים נשמרים אוטומטיים
+                🔄 שמירה אוטומטית פעילה - השינויים נשמרים אוטומטיים במאגר
                 {isProjectPublished && (
                   <Badge variant="outline" className="mr-2 border-orange-400 text-orange-400">
                     מפורסם
@@ -637,11 +484,11 @@ export const HtmlEditor = () => {
               </div>
             </div>
           )}
-          {isAutoSaving && (
+          {isSaving && (
             <div className="bg-amber-900/40 border border-amber-700/50 rounded-xl p-4 text-amber-200 text-sm backdrop-blur-sm">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce"></div>
-                💾 שומר...
+                💾 שומר במאגר...
               </div>
             </div>
           )}

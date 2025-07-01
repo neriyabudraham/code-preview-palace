@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useUserProjects } from "@/hooks/use-user-projects";
 
 interface PublishedPage {
   id: string;
@@ -28,11 +28,7 @@ export const PublishedPagesManager = () => {
   const [previewPage, setPreviewPage] = useState<PublishedPage | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
-
-  // Get user-specific localStorage key
-  const getUserProjectsKey = () => {
-    return user ? `htmlProjects_${user.id}` : "htmlProjects";
-  };
+  const { markAsPublished } = useUserProjects();
 
   // Load pages on component mount and when user changes
   useEffect(() => {
@@ -70,11 +66,6 @@ export const PublishedPagesManager = () => {
       console.log('Fetched published pages:', data);
       setPublishedPages(data || []);
 
-      // Update localStorage projects with published status
-      if (data && data.length > 0) {
-        updateLocalProjectsWithPublishedStatus(data);
-      }
-
     } catch (error) {
       console.error('Error loading published pages:', error);
       toast({
@@ -84,42 +75,6 @@ export const PublishedPagesManager = () => {
       });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const updateLocalProjectsWithPublishedStatus = (publishedPages: PublishedPage[]) => {
-    try {
-      const userProjectsKey = getUserProjectsKey();
-      const savedProjects = JSON.parse(localStorage.getItem(userProjectsKey) || "[]");
-      let hasChanges = false;
-
-      const updatedProjects = savedProjects.map((project: any) => {
-        const publishedPage = publishedPages.find(page => 
-          page.project_id === project.id || 
-          page.slug === project.customSlug
-        );
-
-        if (publishedPage) {
-          hasChanges = true;
-          return {
-            ...project,
-            publishedUrl: publishedPage.custom_domain 
-              ? `https://${publishedPage.custom_domain}/${publishedPage.slug}`
-              : `https://html-to-site.lovable.app/${publishedPage.slug}`,
-            customSlug: publishedPage.slug,
-            publishedAt: publishedPage.created_at
-          };
-        }
-
-        return project;
-      });
-
-      if (hasChanges) {
-        localStorage.setItem(userProjectsKey, JSON.stringify(updatedProjects));
-        console.log('Updated local projects with published status');
-      }
-    } catch (error) {
-      console.error('Error updating local projects:', error);
     }
   };
 
@@ -145,21 +100,17 @@ export const PublishedPagesManager = () => {
         throw error;
       }
 
-      // Save to localStorage as a new project with user-specific key
-      const userProjectsKey = getUserProjectsKey();
-      const savedProjects = JSON.parse(localStorage.getItem(userProjectsKey) || "[]");
-      const newProject = {
-        id: Date.now().toString(),
+      // Save to database as a new project using the userProjectsService
+      const { userProjectsService } = await import("@/services/userProjectsService");
+      
+      const newProject = await userProjectsService.createProject({
+        user_id: user.id,
+        project_id: Date.now().toString(),
         name: `${page.title} (שוחזר)`,
-        html: data.html_content,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        versions: [],
-        userId: user.id // Add user ID to the project
-      };
-
-      savedProjects.push(newProject);
-      localStorage.setItem(userProjectsKey, JSON.stringify(savedProjects));
+        html_content: data.html_content,
+        is_draft: false,
+        is_published: false
+      });
 
       toast({
         title: "פרויקט נשמר!",
@@ -202,32 +153,6 @@ export const PublishedPagesManager = () => {
         console.log(`Updated published pages list. Removed ${title}, remaining: ${updated.length} pages`);
         return updated;
       });
-      
-      // Update localStorage projects - remove publication data (user-specific)
-      try {
-        if (user) {
-          const userProjectsKey = getUserProjectsKey();
-          const savedProjects = JSON.parse(localStorage.getItem(userProjectsKey) || "[]");
-          console.log('Current localStorage projects:', savedProjects);
-          
-          const updatedProjects = savedProjects.map((project: any) => {
-            // Check if this project matches the deleted page
-            if (project.customSlug === slug || project.publishedUrl?.includes(slug)) {
-              console.log(`Removing publication data from project: ${project.name || project.id}`);
-              // Remove publication-related fields
-              const { publishedUrl, customSlug, publishedAt, ...cleanProject } = project;
-              return cleanProject;
-            }
-            return project;
-          });
-          
-          localStorage.setItem(userProjectsKey, JSON.stringify(updatedProjects));
-          console.log('Updated localStorage projects:', updatedProjects);
-        }
-      } catch (localStorageError) {
-        console.error('Error updating localStorage:', localStorageError);
-        // Don't fail the operation if localStorage update fails
-      }
 
       toast({
         title: "נמחק בהצלחה",
