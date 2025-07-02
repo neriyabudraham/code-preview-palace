@@ -9,6 +9,7 @@ import { Save, Play, RotateCcw, Copy, Share2, FileText, Trash2 } from "lucide-re
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const EMPTY_HTML = "";
 
