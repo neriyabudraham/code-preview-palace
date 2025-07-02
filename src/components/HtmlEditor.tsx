@@ -248,10 +248,6 @@ export const HtmlEditor = () => {
       lastSavedContentRef.current = ""; // Mark as unsaved since it's from local storage
       setHasUnsavedChanges(true);
       
-      toast({
-        title: "נתונים שוחזרו",
-        description: "העבודה השמורה במקומי שוחזרה",
-      });
       return;
     }
 
