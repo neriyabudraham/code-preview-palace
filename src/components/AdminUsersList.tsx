@@ -68,9 +68,9 @@ export function AdminUsersList() {
     setIsAddingAdmin(true);
     try {
       // First, check if user exists in auth.users
-      const { data: userData, error: userError } = await supabase.rpc('get_user_by_email', {
+      const { data: userData, error: userError } = await (supabase as any).rpc('get_user_by_email', {
         email_input: newAdminEmail
-      }) as { data: UserData[] | null, error: any };
+      });
 
       if (userError) {
         console.error('Error fetching user:', userError);
