@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -11,10 +12,9 @@ interface PublishDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   project: any;
-  onPublishComplete?: () => void | Promise<void>;
 }
 
-export const PublishDialog = ({ open, onOpenChange, project, onPublishComplete }: PublishDialogProps) => {
+export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProps) => {
   const [publishedUrl, setPublishedUrl] = useState("");
   const [customSlug, setCustomSlug] = useState("");
   const [isPublishing, setIsPublishing] = useState(false);
@@ -161,11 +161,6 @@ export const PublishDialog = ({ open, onOpenChange, project, onPublishComplete }
         title: "פורסם מחדש בהצלחה! 🎉",
         description: `הפרויקט "${project.name}" עודכן עם התוכן החדש`,
       });
-
-      // Call onPublishComplete callback if provided
-      if (onPublishComplete) {
-        await onPublishComplete();
-      }
       
     } catch (error) {
       console.error("Republishing error:", error);
@@ -310,11 +305,6 @@ export const PublishDialog = ({ open, onOpenChange, project, onPublishComplete }
       });
       
       setIsUpdatingExisting(true);
-
-      // Call onPublishComplete callback if provided
-      if (onPublishComplete) {
-        await onPublishComplete();
-      }
     } catch (error) {
       console.error("Publishing error:", error);
       
