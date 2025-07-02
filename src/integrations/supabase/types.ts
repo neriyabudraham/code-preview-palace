@@ -310,6 +310,10 @@ export type Database = {
           total_page_visits: number
         }[]
       }
+      is_admin: {
+        Args: { user_id: string }
+        Returns: boolean
+      }
       update_domain_verification: {
         Args: { _user_id: string; _verified: boolean }
         Returns: boolean
