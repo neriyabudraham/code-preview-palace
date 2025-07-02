@@ -74,16 +74,6 @@ export const HtmlEditor = () => {
     return null;
   }, [user?.id]);
 
-  // Clear local storage
-  const clearLocalStorage = useCallback(() => {
-    try {
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
-      setLastLocalSave(null);
-      console.log("Cleared local storage");
-    } catch (error) {
-      console.error("Error clearing local storage:", error);
-    }
-  }, []);
 
   // Generate default filename with automatic numbering
   const generateDefaultFileName = useCallback(() => {
