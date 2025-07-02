@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,7 +70,7 @@ export function AdminUsersList() {
       // First, check if user exists in auth.users
       const { data: userData, error: userError } = await supabase.rpc('get_user_by_email', {
         email_input: newAdminEmail
-      });
+      }) as { data: UserData[] | null, error: any };
 
       if (userError) {
         console.error('Error fetching user:', userError);
@@ -83,7 +82,7 @@ export function AdminUsersList() {
         return;
       }
 
-      if (!userData || !Array.isArray(userData) || userData.length === 0) {
+      if (!userData || userData.length === 0) {
         toast({
           title: "שגיאה",
           description: "משתמש עם כתובת אימייל זו לא נמצא במערכת",
@@ -92,7 +91,7 @@ export function AdminUsersList() {
         return;
       }
 
-      const user = userData[0] as UserData;
+      const user = userData[0];
 
       // Add to admin_users table
       const { error } = await supabase
