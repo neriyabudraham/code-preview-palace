@@ -18,6 +18,11 @@ interface AdminUser {
   created_by: string | null;
 }
 
+interface UserData {
+  id: string;
+  email: string;
+}
+
 export function AdminUsersList() {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +73,17 @@ export function AdminUsersList() {
         email_input: newAdminEmail
       });
 
-      if (userError || !userData) {
+      if (userError) {
+        console.error('Error fetching user:', userError);
+        toast({
+          title: "שגיאה",
+          description: "אירעה שגיאה בחיפוש המשתמש",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!userData || !Array.isArray(userData) || userData.length === 0) {
         toast({
           title: "שגיאה",
           description: "משתמש עם כתובת אימייל זו לא נמצא במערכת",
@@ -77,11 +92,13 @@ export function AdminUsersList() {
         return;
       }
 
+      const user = userData[0] as UserData;
+
       // Add to admin_users table
       const { error } = await supabase
         .from('admin_users')
         .insert({
-          user_id: userData.id,
+          user_id: user.id,
           email: newAdminEmail.trim()
         });
 
