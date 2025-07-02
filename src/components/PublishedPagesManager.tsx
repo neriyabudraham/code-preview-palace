@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { PageAnalytics } from "./PageAnalytics";
 
 interface PublishedPage {
   id: string;
@@ -288,6 +289,9 @@ export const PublishedPagesManager = () => {
                     </Badge>
                   )}
                 </div>
+
+                {/* Analytics Section */}
+                <PageAnalytics publishedPageId={page.id} className="mb-3" />
                 
                 <div className="text-xs text-slate-500 space-y-1">
                   <div className="flex items-center gap-1">

@@ -9,6 +9,7 @@ export const PublishedPageViewer = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const visitTrackedRef = useRef(false);
 
   useEffect(() => {
     const fetchPage = async () => {
@@ -86,6 +87,12 @@ export const PublishedPageViewer = () => {
           document.title = page.title;
         }
 
+        // Track visit (only once per page load)
+        if (!visitTrackedRef.current) {
+          visitTrackedRef.current = true;
+          trackPageVisit(slug);
+        }
+
       } catch (err) {
         console.error('Error fetching page:', err);
         setError("שגיאה בטעינת הדף");
@@ -95,6 +102,24 @@ export const PublishedPageViewer = () => {
 
     fetchPage();
   }, [slug]);
+
+  const trackPageVisit = async (slug: string) => {
+    try {
+      console.log('Tracking visit for slug:', slug);
+      
+      await supabase.functions.invoke('track-visit', {
+        body: {
+          slug,
+          referrer: document.referrer || null
+        }
+      });
+      
+      console.log('Visit tracked successfully');
+    } catch (error) {
+      console.error('Error tracking visit:', error);
+      // Don't fail the page load if visit tracking fails
+    }
+  };
 
   // Use iframe to properly render HTML content
   useEffect(() => {

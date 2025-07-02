@@ -9,6 +9,47 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      page_visits: {
+        Row: {
+          created_at: string
+          id: string
+          ip_address: string | null
+          published_page_id: string | null
+          referrer: string | null
+          slug: string
+          user_agent: string | null
+          visited_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          published_page_id?: string | null
+          referrer?: string | null
+          slug: string
+          user_agent?: string | null
+          visited_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          published_page_id?: string | null
+          referrer?: string | null
+          slug?: string
+          user_agent?: string | null
+          visited_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "page_visits_published_page_id_fkey"
+            columns: ["published_page_id"]
+            isOneToOne: false
+            referencedRelation: "published_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
