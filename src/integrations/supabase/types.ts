@@ -291,7 +291,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      delete_user_and_data: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
+      get_users_with_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          email: string
+          full_name: string
+          custom_domain: string
+          domain_verified: boolean
+          last_seen: string
+          is_online: boolean
+          login_count: number
+          site_count: number
+          total_page_visits: number
+        }[]
+      }
+      update_domain_verification: {
+        Args: { _user_id: string; _verified: boolean }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

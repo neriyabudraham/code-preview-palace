@@ -146,6 +146,21 @@ export const CustomDomainManager = () => {
       setCurrentDomain(fullDomain);
       setIsDomainVerified(false);
 
+      // Send webhook notification
+      try {
+        await supabase.functions.invoke('domain-webhook', {
+          body: {
+            userId: user.id,
+            domain: fullDomain,
+            action: 'domain_added'
+          }
+        });
+        console.log('Domain webhook sent successfully');
+      } catch (webhookError) {
+        console.error('Error sending domain webhook:', webhookError);
+        // Don't fail the main operation if webhook fails
+      }
+
       toast({
         title: "נשמר בהצלחה!",
         description: "הדומיין המותאם אישית נשמר. יש להגדיר את רשומת ה-DNS כדי להשלים את ההגדרה",

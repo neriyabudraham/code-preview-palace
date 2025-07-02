@@ -8,7 +8,8 @@ import { AdminUsersList } from "./AdminUsersList";
 import { OnlineUsersTable } from "./OnlineUsersTable";
 import { WebhookLogsList } from "./WebhookLogsList";
 import { AdminAnalytics } from "./AdminAnalytics";
-import { Shield, Users, Globe, Activity, BarChart3 } from "lucide-react";
+import { UsersManagement } from "./UsersManagement";
+import { Shield, Users, Globe, Activity, BarChart3, UserCog } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export function AdminDashboard() {
@@ -86,10 +87,14 @@ export function AdminDashboard() {
         </div>
 
         <Tabs defaultValue="analytics" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 bg-gray-800 border-gray-700">
+          <TabsList className="grid w-full grid-cols-6 bg-gray-800 border-gray-700">
             <TabsTrigger value="analytics" className="flex items-center gap-2">
               <BarChart3 size={16} />
               אנליטיקה
+            </TabsTrigger>
+            <TabsTrigger value="users-management" className="flex items-center gap-2">
+              <UserCog size={16} />
+              ניהול משתמשים
             </TabsTrigger>
             <TabsTrigger value="admins" className="flex items-center gap-2">
               <Shield size={16} />
@@ -111,6 +116,10 @@ export function AdminDashboard() {
 
           <TabsContent value="analytics" className="mt-6">
             <AdminAnalytics />
+          </TabsContent>
+
+          <TabsContent value="users-management" className="mt-6">
+            <UsersManagement />
           </TabsContent>
 
           <TabsContent value="admins" className="mt-6">
