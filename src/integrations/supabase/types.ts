@@ -9,6 +9,33 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      admin_users: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          email: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          email: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       page_visits: {
         Row: {
           created_at: string
@@ -161,6 +188,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_online_status: {
+        Row: {
+          is_online: boolean
+          last_seen: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          is_online?: boolean
+          last_seen?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          is_online?: boolean
+          last_seen?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_projects: {
         Row: {
           created_at: string
@@ -207,6 +255,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      webhook_logs: {
+        Row: {
+          created_at: string
+          id: string
+          payload: Json
+          response_body: string | null
+          response_status: number | null
+          user_id: string | null
+          webhook_url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          payload: Json
+          response_body?: string | null
+          response_status?: number | null
+          user_id?: string | null
+          webhook_url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          payload?: Json
+          response_body?: string | null
+          response_status?: number | null
+          user_id?: string | null
+          webhook_url?: string
+        }
+        Relationships: []
       }
     }
     Views: {

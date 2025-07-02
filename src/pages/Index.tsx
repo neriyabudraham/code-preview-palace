@@ -1,19 +1,44 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { HtmlEditor } from "@/components/HtmlEditor";
 import { ProjectManager } from "@/components/ProjectManager";
 import { PublishedPagesManager } from "@/components/PublishedPagesManager";
 import { CustomDomainManager } from "@/components/CustomDomainManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Code, FolderOpen, LogOut, User, Globe2, Globe } from "lucide-react";
+import { Code, FolderOpen, LogOut, User, Globe2, Globe, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("editor");
+  const [isAdmin, setIsAdmin] = useState(false);
   const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user) return;
+
+      try {
+        const { data } = await supabase
+          .from('admin_users')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+
+        setIsAdmin(!!data);
+      } catch (error) {
+        // User is not an admin, which is fine
+        setIsAdmin(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, [user]);
 
   const handleEditProject = () => {
     setActiveTab("editor");
@@ -35,6 +60,10 @@ const Index = () => {
     }
   };
 
+  const handleAdminClick = () => {
+    navigate('/admin');
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm">
@@ -54,6 +83,19 @@ const Index = () => {
                 <User className="w-4 h-4" />
                 <span>{user?.email}</span>
               </div>
+              
+              {isAdmin && (
+                <Button
+                  onClick={handleAdminClick}
+                  variant="outline"
+                  size="sm"
+                  className="border-purple-600 text-purple-400 hover:bg-purple-600"
+                >
+                  <Shield className="w-4 h-4 mr-2" />
+                  ניהול
+                </Button>
+              )}
+              
               <Button
                 onClick={handleSignOut}
                 variant="outline"
