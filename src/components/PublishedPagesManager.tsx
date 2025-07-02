@@ -1,14 +1,14 @@
+
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { ExternalLink, Trash2, Globe, Calendar, Copy, Save, Eye, RefreshCw } from "lucide-react";
+import { ExternalLink, Trash2, Globe, Calendar, Copy, Save, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useUserProjects } from "@/hooks/useUserProjects";
 
 interface PublishedPage {
   id: string;
@@ -28,14 +28,12 @@ export const PublishedPagesManager = () => {
   const [previewPage, setPreviewPage] = useState<PublishedPage | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
-  const { markAsPublished } = useUserProjects();
 
-  // Load pages on component mount and when user changes
+  // Load pages on component mount
   useEffect(() => {
     if (user) {
       loadPublishedPages();
     } else {
-      setPublishedPages([]);
       setIsLoading(false);
     }
   }, [user]);
@@ -47,9 +45,6 @@ export const PublishedPagesManager = () => {
       return;
     }
 
-    console.log('Loading published pages for user:', user.id);
-    setIsLoading(true);
-
     try {
       // Fetch pages with html_content for preview
       const { data, error } = await supabase
@@ -59,13 +54,10 @@ export const PublishedPagesManager = () => {
         .order('updated_at', { ascending: false });
 
       if (error) {
-        console.error('Supabase error:', error);
         throw error;
       }
 
-      console.log('Fetched published pages:', data);
       setPublishedPages(data || []);
-
     } catch (error) {
       console.error('Error loading published pages:', error);
       toast({
@@ -100,21 +92,25 @@ export const PublishedPagesManager = () => {
         throw error;
       }
 
-      // Save to database as a new project using the userProjectsService
-      const { userProjectsService } = await import("@/services/userProjectsService");
-      
-      const newProject = await userProjectsService.createProject({
-        user_id: user.id,
-        project_id: Date.now().toString(),
+      // Save to localStorage as a new project with user-specific key
+      const userProjectsKey = `htmlProjects_${user.id}`;
+      const savedProjects = JSON.parse(localStorage.getItem(userProjectsKey) || "[]");
+      const newProject = {
+        id: Date.now().toString(),
         name: `${page.title} (שוחזר)`,
-        html_content: data.html_content,
-        is_draft: false,
-        is_published: false
-      });
+        html: data.html_content,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        versions: [],
+        userId: user.id // Add user ID to the project
+      };
+
+      savedProjects.push(newProject);
+      localStorage.setItem(userProjectsKey, JSON.stringify(savedProjects));
 
       toast({
         title: "פרויקט נשמר!",
-        description: `הפרויקט "${page.title}" נשמר בהצלחה בפרויקטים`,
+        description: `הפרויקט "${page.title}" נשמר בהצלחה בפרוייקטים`,
       });
 
     } catch (error) {
@@ -153,6 +149,32 @@ export const PublishedPagesManager = () => {
         console.log(`Updated published pages list. Removed ${title}, remaining: ${updated.length} pages`);
         return updated;
       });
+      
+      // Update localStorage projects - remove publication data (user-specific)
+      try {
+        if (user) {
+          const userProjectsKey = `htmlProjects_${user.id}`;
+          const savedProjects = JSON.parse(localStorage.getItem(userProjectsKey) || "[]");
+          console.log('Current localStorage projects:', savedProjects);
+          
+          const updatedProjects = savedProjects.map((project: any) => {
+            // Check if this project matches the deleted page
+            if (project.customSlug === slug || project.publishedUrl?.includes(slug)) {
+              console.log(`Removing publication data from project: ${project.name || project.id}`);
+              // Remove publication-related fields
+              const { publishedUrl, customSlug, publishedAt, ...cleanProject } = project;
+              return cleanProject;
+            }
+            return project;
+          });
+          
+          localStorage.setItem(userProjectsKey, JSON.stringify(updatedProjects));
+          console.log('Updated localStorage projects:', updatedProjects);
+        }
+      } catch (localStorageError) {
+        console.error('Error updating localStorage:', localStorageError);
+        // Don't fail the operation if localStorage update fails
+      }
 
       toast({
         title: "נמחק בהצלחה",
@@ -169,14 +191,6 @@ export const PublishedPagesManager = () => {
     } finally {
       setDeletingPageId(null);
     }
-  };
-
-  const refreshPages = () => {
-    loadPublishedPages();
-    toast({
-      title: "רענון",
-      description: "הדפים המפורסמים רוענו",
-    });
   };
 
   const formatDate = (dateString: string) => {
@@ -230,13 +244,9 @@ export const PublishedPagesManager = () => {
       <Card className="p-8 bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800 border-slate-700 text-center shadow-xl">
         <Globe className="mx-auto mb-4 text-slate-400" size={48} />
         <h3 className="text-xl font-bold text-white mb-2">אין דפים מפורסמים</h3>
-        <p className="text-slate-400 mb-4">
+        <p className="text-slate-400">
           עדיין לא פרסמת דפים. פרסם דף ראשון מהעורך!
         </p>
-        <Button onClick={refreshPages} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-700">
-          <RefreshCw size={16} className="mr-2" />
-          רענן
-        </Button>
       </Card>
     );
   }
@@ -245,15 +255,9 @@ export const PublishedPagesManager = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-white">דפים מפורסמים</h2>
-        <div className="flex items-center gap-3">
-          <Button onClick={refreshPages} variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-700">
-            <RefreshCw size={16} className="mr-2" />
-            רענן
-          </Button>
-          <Badge variant="secondary" className="bg-slate-700/50 text-slate-300 px-3 py-1">
-            {publishedPages.length} מפורסמים
-          </Badge>
-        </div>
+        <Badge variant="secondary" className="bg-slate-700/50 text-slate-300 px-3 py-1">
+          {publishedPages.length} מפורסמים
+        </Badge>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
