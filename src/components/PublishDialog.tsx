@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -144,7 +143,7 @@ export const PublishDialog = ({
       const titleMatch = project.html.match(/<title[^>]*>([^<]+)<\/title>/i);
       const title = titleMatch ? titleMatch[1] : project.name;
 
-      const republishPageData = {
+      const publishedPageData = {
         title,
         html_content: project.html,
         updated_at: new Date().toISOString(),
@@ -152,12 +151,12 @@ export const PublishDialog = ({
         custom_domain: userDomain
       };
 
-      console.log('Republishing page data:', republishPageData);
+      console.log('Republishing page data:', publishedPageData);
 
       // Update existing published page
       const result = await supabase
         .from('published_pages')
-        .update(republishPageData)
+        .update(publishedPageData)
         .eq('project_id', project.id)
         .eq('slug', slug)
         .eq('user_id', user.id)
@@ -270,7 +269,7 @@ export const PublishDialog = ({
       const titleMatch = project.html.match(/<title[^>]*>([^<]+)<\/title>/i);
       const title = titleMatch ? titleMatch[1] : project.name;
 
-      const newPublishedPageData = {
+      const publishedPageData = {
         slug,
         title,
         html_content: project.html,
@@ -280,7 +279,7 @@ export const PublishDialog = ({
         custom_domain: userDomain
       };
 
-      console.log('Publishing page data:', newPublishedPageData);
+      console.log('Publishing page data:', publishedPageData);
 
       // Check if this project already has a published page
       const { data: existingProjectPage, error: existingError } = await supabase
@@ -295,7 +294,7 @@ export const PublishDialog = ({
         // Update existing published page
         result = await supabase
           .from('published_pages')
-          .update(newPublishedPageData)
+          .update(publishedPageData)
           .eq('id', existingProjectPage.id)
           .select()
           .single();
@@ -303,7 +302,7 @@ export const PublishDialog = ({
         // Create new published page
         result = await supabase
           .from('published_pages')
-          .insert(newPublishedPageData)
+          .insert(publishedPageData)
           .select()
           .single();
       }
@@ -520,9 +519,9 @@ export const PublishDialog = ({
                 <Button 
                   onClick={handlePublish}
                   disabled={isPublishing || !customSlug.trim()}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white shadow-lg transition-all duration-200 px-8 py-4 text-lg font-medium rounded-lg h-12 border border-green-600"
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all duration-300 transform hover:scale-105 px-8 py-4 text-lg font-bold rounded-xl h-14"
                 >
-                  <Share2 size={18} className="mr-3" />
+                  <Share2 size={24} className="mr-3" />
                   {getPublishButtonText()}
                 </Button>
 
@@ -530,7 +529,7 @@ export const PublishDialog = ({
                   <Button 
                     onClick={resetToNewPublish}
                     variant="outline"
-                    className="w-full border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 rounded-lg h-12"
+                    className="w-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
                   >
                     פרסם בסיומת חדשה
                   </Button>
@@ -564,7 +563,7 @@ export const PublishDialog = ({
                   <Button 
                     onClick={copyLink}
                     variant="outline"
-                    className="border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 px-4 rounded-lg"
+                    className="border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white transition-all duration-200 px-4"
                   >
                     <Copy size={16} />
                   </Button>
@@ -574,7 +573,7 @@ export const PublishDialog = ({
               <div className="grid grid-cols-2 gap-4">
                 <Button 
                   onClick={openLink}
-                  className="bg-green-600 hover:bg-green-700 text-white shadow-lg transition-all duration-200 font-medium py-3 rounded-lg border border-green-600"
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg transition-all duration-300 transform hover:scale-105 font-bold py-3 rounded-xl"
                 >
                   <ExternalLink size={18} className="mr-2" />
                   פתח דף
@@ -583,17 +582,18 @@ export const PublishDialog = ({
                 <Button 
                   onClick={shareLink}
                   variant="outline"
-                  className="border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 font-medium py-3 rounded-lg"
+                  className="border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white transition-all duration-300 transform hover:scale-105 font-bold py-3 rounded-xl"
                 >
                   <Share2 size={18} className="mr-2" />
                   שתף
                 </Button>
               </div>
 
+              {/* Republish Button - New Feature */}
               <Button 
                 onClick={handleRepublish}
                 disabled={isRepublishing}
-                className="w-full bg-orange-600 hover:bg-orange-700 text-white shadow-lg transition-all duration-200 font-medium py-3 rounded-lg border border-orange-600"
+                className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white shadow-lg transition-all duration-300 transform hover:scale-105 font-bold py-3 rounded-xl"
               >
                 <RefreshCw size={18} className={`mr-2 ${isRepublishing ? 'animate-spin' : ''}`} />
                 {isRepublishing ? "מפרסם מחדש..." : "פרסם מחדש"}
@@ -602,7 +602,7 @@ export const PublishDialog = ({
               <Button 
                 onClick={resetToNewPublish}
                 variant="outline"
-                className="w-full border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 font-medium rounded-lg h-12"
+                className="w-full border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 font-medium"
               >
                 שנה סיומת
               </Button>
