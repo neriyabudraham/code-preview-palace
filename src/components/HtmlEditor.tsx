@@ -190,11 +190,47 @@ export const HtmlEditor = () => {
     };
   }, [fileName, htmlCode, saveTempWork]);
 
-  // Load draft and temporary work on component mount
+  // Load project for editing and load draft and temporary work on component mount
   useEffect(() => {
     if (!user) return;
 
-    // Load existing draft
+    // First, check if there's a project to edit from sessionStorage
+    const editingProject = sessionStorage.getItem("editingProject");
+    if (editingProject) {
+      try {
+        const project = JSON.parse(editingProject);
+        console.log('Loading project for editing:', project);
+        
+        // Set the project data
+        setHtmlCode(project.html || project.htmlCode || '');
+        setFileName(project.name || project.fileName || '');
+        setCurrentProjectId(project.id);
+        setIsEditingExisting(true);
+        lastSavedContentRef.current = project.html || project.htmlCode || '';
+        setHasUnsavedChanges(false);
+        
+        // Check if project is published
+        checkIfProjectIsPublished(project.id);
+        
+        // Set last saved project for publish functionality
+        setLastSavedProject(project);
+        
+        // Clear the sessionStorage item
+        sessionStorage.removeItem("editingProject");
+        
+        toast({
+          title: "פרויקט נטען",
+          description: `"${project.name}" נטען לעריכה`,
+        });
+        
+        return; // Don't load draft if we're editing a project
+      } catch (error) {
+        console.error('Error loading project for editing:', error);
+        sessionStorage.removeItem("editingProject");
+      }
+    }
+
+    // Load existing draft only if not editing a project
     const savedDraft = localStorage.getItem(getUserDraftKey());
     if (savedDraft) {
       try {
@@ -206,7 +242,7 @@ export const HtmlEditor = () => {
       }
     }
 
-    // Load temporary work
+    // Load temporary work only if not editing a project and no draft
     const tempWork = localStorage.getItem(getUserTempWorkKey());
     if (tempWork && !savedDraft) {
       try {
@@ -222,8 +258,10 @@ export const HtmlEditor = () => {
       }
     }
 
-    lastSavedContentRef.current = "";
-  }, [user, getUserDraftKey, getUserTempWorkKey]);
+    if (!editingProject) {
+      lastSavedContentRef.current = "";
+    }
+  }, [user, getUserDraftKey, getUserTempWorkKey, checkIfProjectIsPublished, toast]);
 
   // Auto-save function - only for existing projects
   const autoSave = useCallback(async () => {
