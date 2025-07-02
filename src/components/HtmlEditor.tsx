@@ -10,7 +10,6 @@ import { Save, Play, RotateCcw, Copy, Share2, FileText, Trash2 } from "lucide-re
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 
 const EMPTY_HTML = "";
 
@@ -61,20 +60,11 @@ export const HtmlEditor = () => {
   }, [currentProjectId, getUserProjectsKey]);
 
   // Check if current project is published
-  const checkIfProjectIsPublished = useCallback(async (projectId: string) => {
-    try {
-      const { data: publishedPage } = await supabase
-        .from('published_pages')
-        .select('*')
-        .eq('project_id', projectId)
-        .eq('user_id', user?.id)
-        .single();
-      
-      return !!publishedPage;
-    } catch {
-      return false;
-    }
-  }, [user]);
+  const checkIfProjectIsPublished = useCallback((projectId: string) => {
+    const savedProjects = JSON.parse(localStorage.getItem(getUserProjectsKey()) || "[]");
+    const project = savedProjects.find((p: any) => p.id === projectId);
+    return project && (project.publishedUrl || project.customSlug);
+  }, [getUserProjectsKey]);
 
   // Save temporary work when filename changes
   const saveTempWork = useCallback(() => {
@@ -191,28 +181,14 @@ export const HtmlEditor = () => {
             updatedAt: now,
             userId: user.id
           };
-
-          // Also update in Supabase
-          await supabase
-            .from('user_projects')
-            .upsert({
-              project_id: currentProjectId,
-              user_id: user.id,
-              name: finalFileName,
-              html_content: htmlCode,
-              updated_at: now,
-              is_draft: false,
-              is_published: await checkIfProjectIsPublished(currentProjectId)
-            });
           
           // Check if project is published
-          setIsProjectPublished(await checkIfProjectIsPublished(currentProjectId));
+          setIsProjectPublished(checkIfProjectIsPublished(currentProjectId));
         }
       } else {
         // Create new project for auto-save
-        const projectId = Date.now().toString();
         const project = {
-          id: projectId,
+          id: Date.now().toString(),
           name: finalFileName,
           html: htmlCode,
           createdAt: now,
@@ -222,23 +198,9 @@ export const HtmlEditor = () => {
         };
 
         savedProjects.push(project);
-        setCurrentProjectId(projectId);
+        setCurrentProjectId(project.id);
         setIsEditingExisting(true);
         setIsProjectPublished(false);
-
-        // Also save to Supabase
-        await supabase
-          .from('user_projects')
-          .insert({
-            project_id: projectId,
-            user_id: user.id,
-            name: finalFileName,
-            html_content: htmlCode,
-            created_at: now,
-            updated_at: now,
-            is_draft: false,
-            is_published: false
-          });
       }
 
       localStorage.setItem(getUserProjectsKey(), JSON.stringify(savedProjects));
@@ -304,19 +266,16 @@ export const HtmlEditor = () => {
     if (editingProject) {
       try {
         const project = JSON.parse(editingProject);
-        console.log("Loading project from sessionStorage:", project);
-        
         // Verify the project belongs to the current user
         if (!user || project.userId === user.id) {
-          setHtmlCode(project.html || "");
-          setFileName(project.name || "");
+          setHtmlCode(project.html);
+          setFileName(project.name);
           setCurrentProjectId(project.id);
           setIsEditingExisting(true);
           setLastSavedProject(project);
-          setIsProjectPublished(project.isPublished || false);
-          lastSavedContentRef.current = project.html || "";
+          setIsProjectPublished(checkIfProjectIsPublished(project.id));
+          lastSavedContentRef.current = project.html;
           setHasUnsavedChanges(false);
-          
           // Clear the sessionStorage after loading
           sessionStorage.removeItem("editingProject");
           
@@ -328,7 +287,6 @@ export const HtmlEditor = () => {
         }
       } catch (error) {
         console.error("Error loading project:", error);
-        sessionStorage.removeItem("editingProject");
       }
     }
 
@@ -478,7 +436,7 @@ export const HtmlEditor = () => {
     const savedProject = updatedProjects.find((p: any) => p.id === currentProjectId || (p.name === finalFileName && p.html === htmlCode));
     if (savedProject) {
       setLastSavedProject(savedProject);
-      setIsProjectPublished(await checkIfProjectIsPublished(savedProject.id));
+      setIsProjectPublished(checkIfProjectIsPublished(savedProject.id));
     }
     
     toast({
@@ -717,11 +675,6 @@ export const HtmlEditor = () => {
           open={showPublishDialog} 
           onOpenChange={setShowPublishDialog}
           project={lastSavedProject}
-          onPublishComplete={async () => {
-            if (currentProjectId) {
-              setIsProjectPublished(await checkIfProjectIsPublished(currentProjectId));
-            }
-          }}
         />
       )}
     </div>

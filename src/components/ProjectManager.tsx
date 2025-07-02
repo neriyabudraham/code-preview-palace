@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -29,8 +28,6 @@ interface LocalProject {
   versions?: ProjectVersion[];
   publishedUrl?: string;
   isDraft?: boolean;
-  isPublished?: boolean;
-  publishedPageId?: string;
 }
 
 interface DatabaseProject {
@@ -88,36 +85,11 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
         console.log("Loaded database projects:", dbProjects);
       }
 
-      // Load published pages to check status
-      const { data: publishedPages, error: publishError } = await supabase
-        .from('published_pages')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (publishError) {
-        console.error('Error loading published pages:', publishError);
-      } else {
-        console.log("Loaded published pages:", publishedPages);
-      }
-
-      // Create a map of published pages for quick lookup
-      const publishedMap = new Map();
-      if (publishedPages) {
-        publishedPages.forEach(page => {
-          publishedMap.set(page.project_id, {
-            url: `https://sojhyduhenphvbxvjvpv.supabase.co/functions/v1/serve-page/${page.slug}`,
-            pageId: page.id,
-            slug: page.slug
-          });
-        });
-      }
-
       // Combine and format projects
       const allProjects: LocalProject[] = [];
 
       // Add local projects
       localProjects.forEach((project: any) => {
-        const publishedInfo = publishedMap.get(project.id);
         allProjects.push({
           id: project.id,
           name: project.name,
@@ -125,10 +97,8 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
           createdAt: project.createdAt,
           updatedAt: project.updatedAt,
           versions: project.versions || [],
-          publishedUrl: publishedInfo?.url || project.publishedUrl,
-          isDraft: false,
-          isPublished: !!publishedInfo,
-          publishedPageId: publishedInfo?.pageId
+          publishedUrl: project.publishedUrl,
+          isDraft: false
         });
       });
 
@@ -139,7 +109,6 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
           const existsInLocal = allProjects.some(p => p.id === dbProject.project_id);
           
           if (!existsInLocal) {
-            const publishedInfo = publishedMap.get(dbProject.project_id);
             allProjects.push({
               id: dbProject.project_id,
               name: dbProject.name,
@@ -148,19 +117,8 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
               updatedAt: dbProject.updated_at,
               versions: [],
               isDraft: dbProject.is_draft,
-              isPublished: dbProject.is_published || !!publishedInfo,
-              publishedUrl: publishedInfo?.url,
-              publishedPageId: publishedInfo?.pageId || dbProject.published_page_id
+              publishedUrl: dbProject.is_published ? "published" : undefined
             });
-          } else {
-            // Update existing local project with database info
-            const localProject = allProjects.find(p => p.id === dbProject.project_id);
-            if (localProject) {
-              const publishedInfo = publishedMap.get(dbProject.project_id);
-              localProject.isPublished = dbProject.is_published || !!publishedInfo;
-              localProject.publishedUrl = publishedInfo?.url || localProject.publishedUrl;
-              localProject.publishedPageId = publishedInfo?.pageId || dbProject.published_page_id;
-            }
           }
         });
       }
@@ -211,17 +169,6 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
         console.error('Error deleting from database:', error);
       }
 
-      // Delete published page if exists
-      const { error: publishError } = await supabase
-        .from('published_pages')
-        .delete()
-        .eq('project_id', id)
-        .eq('user_id', user.id);
-
-      if (publishError) {
-        console.error('Error deleting published page:', publishError);
-      }
-
       // Update local state
       setProjects(prev => prev.filter(p => p.id !== id));
       
@@ -240,30 +187,10 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
   };
 
   const editProject = (project: LocalProject) => {
-    console.log("Editing project:", project);
-    
-    // Create a complete project object for editing
-    const projectForEdit = {
-      id: project.id,
-      name: project.name,
-      html: project.html,
-      createdAt: project.createdAt,
-      updatedAt: project.updatedAt,
-      versions: project.versions || [],
-      publishedUrl: project.publishedUrl,
-      isDraft: project.isDraft || false,
-      isPublished: project.isPublished || false,
-      publishedPageId: project.publishedPageId,
-      userId: user?.id
-    };
-
     // Store the project to edit in sessionStorage so the editor can pick it up
-    sessionStorage.setItem("editingProject", JSON.stringify(projectForEdit));
-    console.log("Stored project in sessionStorage:", projectForEdit);
-    
+    sessionStorage.setItem("editingProject", JSON.stringify(project));
     // Call the callback to switch tabs
     onEditProject();
-    
     toast({
       title: "עבר לעריכה",
       description: `הפרויקט "${project.name}" נטען לעריכה`,
@@ -281,9 +208,7 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
       updatedAt: new Date().toISOString(),
       versions: [], // Reset versions for duplicate
       isDraft: false,
-      publishedUrl: undefined,
-      isPublished: false,
-      publishedPageId: undefined
+      publishedUrl: undefined
     };
     
     try {
@@ -385,22 +310,6 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
     }
   };
 
-  const openPublishedPage = (project: LocalProject) => {
-    if (project.publishedUrl) {
-      window.open(project.publishedUrl, '_blank');
-    }
-  };
-
-  const copyPublishedLink = (project: LocalProject) => {
-    if (project.publishedUrl) {
-      navigator.clipboard.writeText(project.publishedUrl);
-      toast({
-        title: "קישור הועתק",
-        description: "קישור הדף המפורסם הועתק ללוח",
-      });
-    }
-  };
-
   const getPreviewText = (html: string) => {
     // Extract title from HTML
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
@@ -462,7 +371,7 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => {
             const { title } = getPreviewText(project.html);
-            const isPublished = project.isPublished || !!project.publishedUrl;
+            const isPublished = !!project.publishedUrl;
             const isDraft = project.isDraft;
             
             return (
@@ -477,8 +386,7 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
                       </Badge>
                     )}
                     {isPublished && (
-                      <Badge className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white border-0 shadow-lg cursor-pointer"
-                        onClick={() => openPublishedPage(project)}>
+                      <Badge className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white border-0 shadow-lg">
                         <Globe size={12} className="mr-1" />
                         פורסם
                       </Badge>
@@ -500,18 +408,10 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
                       <p>עודכן: {formatDate(project.updatedAt)}</p>
                     )}
                     {isPublished && (
-                      <div className="flex items-center gap-1 text-emerald-400">
+                      <p className="flex items-center gap-1 text-emerald-400">
                         <Globe size={12} />
-                        <span>סטטוס: פורסם</span>
-                        {project.publishedUrl && (
-                          <button 
-                            className="ml-2 text-blue-400 hover:text-blue-300 underline text-xs"
-                            onClick={() => copyPublishedLink(project)}
-                          >
-                            העתק קישור
-                          </button>
-                        )}
-                      </div>
+                        סטטוס: פורסם
+                      </p>
                     )}
                     {isDraft && (
                       <p className="flex items-center gap-1 text-yellow-400">
@@ -569,18 +469,6 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
                         הורד
                       </Button>
                     </div>
-
-                    {isPublished && project.publishedUrl && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openPublishedPage(project)}
-                        className="w-full border-emerald-600 bg-emerald-700/20 text-emerald-300 hover:bg-emerald-600 hover:text-white transition-all duration-200 shadow-md font-medium"
-                      >
-                        <Globe size={14} className="mr-1" />
-                        צפה בדף המפורסם
-                      </Button>
-                    )}
                     
                     {project.versions && project.versions.length > 0 && (
                       <details className="w-full">
@@ -667,10 +555,6 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
           open={showPublishDialog}
           onOpenChange={setShowPublishDialog}
           project={publishingProject}
-          onPublishComplete={() => {
-            loadProjects(); // Reload projects to update published status
-            setShowPublishDialog(false);
-          }}
         />
       )}
     </div>
