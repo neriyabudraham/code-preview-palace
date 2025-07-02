@@ -11,6 +11,7 @@ import { AdminAnalytics } from "./AdminAnalytics";
 import { UsersManagement } from "./UsersManagement";
 import { Shield, Users, Globe, Activity, BarChart3, UserCog, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useNavigate } from "react-router-dom";
 
 export function AdminDashboard() {
@@ -19,6 +20,9 @@ export function AdminDashboard() {
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Track admin user online status
+  useOnlineStatus();
 
   useEffect(() => {
     const checkAdminStatus = async () => {

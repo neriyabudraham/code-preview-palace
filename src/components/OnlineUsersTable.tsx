@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,8 +39,8 @@ export function OnlineUsersTable() {
       )
       .subscribe();
 
-    // Update every minute to refresh "last seen" times
-    const interval = setInterval(fetchOnlineUsers, 60000);
+    // Update every 30 seconds to refresh status and times
+    const interval = setInterval(fetchOnlineUsers, 30000);
 
     return () => {
       supabase.removeChannel(channel);
@@ -51,13 +50,23 @@ export function OnlineUsersTable() {
 
   const fetchOnlineUsers = async () => {
     try {
+      // Consider users offline if they haven't been seen in the last 2 minutes
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+      
       const { data, error } = await supabase
         .from('user_online_status')
         .select('*')
         .order('last_seen', { ascending: false });
 
       if (error) throw error;
-      setOnlineUsers(data || []);
+      
+      // Update the is_online status based on last_seen time
+      const updatedUsers = (data || []).map(user => ({
+        ...user,
+        is_online: user.is_online && user.last_seen > twoMinutesAgo
+      }));
+      
+      setOnlineUsers(updatedUsers);
     } catch (error) {
       console.error('Error fetching online users:', error);
       toast({
@@ -71,7 +80,10 @@ export function OnlineUsersTable() {
   };
 
   const getLastSeenText = (lastSeen: string, isOnline: boolean) => {
-    if (isOnline) {
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const actuallyOnline = isOnline && lastSeen > twoMinutesAgo;
+    
+    if (actuallyOnline) {
       return "מקוון כעת";
     }
     
@@ -97,7 +109,8 @@ export function OnlineUsersTable() {
     );
   }
 
-  const onlineCount = onlineUsers.filter(user => user.is_online).length;
+  const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  const onlineCount = onlineUsers.filter(user => user.is_online && user.last_seen > twoMinutesAgo).length;
 
   return (
     <Card className="bg-gray-800 border-gray-700">
@@ -110,7 +123,7 @@ export function OnlineUsersTable() {
           </Badge>
         </CardTitle>
         <CardDescription className="text-gray-400">
-          מעקב אחר פעילות המשתמשים בזמן אמת
+          מעקב אחר פעילות המשתמשים בזמן אמת (מעודכן כל 30 שניות)
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -124,42 +137,47 @@ export function OnlineUsersTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {onlineUsers.map((user) => (
-              <TableRow key={user.user_id}>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Circle 
-                      className={`w-3 h-3 ${
-                        user.is_online 
-                          ? 'text-green-500 fill-green-500' 
-                          : 'text-gray-500 fill-gray-500'
-                      }`}
-                    />
-                    <Badge 
-                      variant={user.is_online ? "default" : "secondary"}
-                      className={user.is_online ? "bg-green-600" : "bg-gray-600"}
-                    >
-                      {user.is_online ? "מקוון" : "לא מקוון"}
-                    </Badge>
-                  </div>
-                </TableCell>
-                <TableCell className="text-white font-mono text-sm">
-                  {user.user_id.substring(0, 8)}...
-                </TableCell>
-                <TableCell className="text-gray-400">
-                  {getLastSeenText(user.last_seen, user.is_online)}
-                </TableCell>
-                <TableCell className="text-gray-400">
-                  {new Date(user.updated_at).toLocaleString('he-IL')}
-                </TableCell>
-              </TableRow>
-            ))}
+            {onlineUsers.map((user) => {
+              const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+              const actuallyOnline = user.is_online && user.last_seen > twoMinutesAgo;
+              
+              return (
+                <TableRow key={user.user_id}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Circle 
+                        className={`w-3 h-3 ${
+                          actuallyOnline
+                            ? 'text-green-500 fill-green-500' 
+                            : 'text-gray-500 fill-gray-500'
+                        }`}
+                      />
+                      <Badge 
+                        variant={actuallyOnline ? "default" : "secondary"}
+                        className={actuallyOnline ? "bg-green-600" : "bg-gray-600"}
+                      >
+                        {actuallyOnline ? "מקוון" : "לא מקוון"}
+                      </Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-white font-mono text-sm">
+                    {user.user_id.substring(0, 8)}...
+                  </TableCell>
+                  <TableCell className="text-gray-400">
+                    {getLastSeenText(user.last_seen, user.is_online)}
+                  </TableCell>
+                  <TableCell className="text-gray-400">
+                    {new Date(user.updated_at).toLocaleString('he-IL')}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
         
         {onlineUsers.length === 0 && (
           <div className="text-center py-8 text-gray-400">
-            אין משתמשים מקוונים כרגע
+            אין נתוני פעילות זמינים
           </div>
         )}
       </CardContent>

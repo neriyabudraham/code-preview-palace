@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { HtmlEditor } from "@/components/HtmlEditor";
 import { ProjectManager } from "@/components/ProjectManager";
@@ -9,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Code, FolderOpen, LogOut, User, Globe2, Globe, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 
@@ -18,6 +18,9 @@ const Index = () => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Track user online status
+  useOnlineStatus();
 
   useEffect(() => {
     const checkAdminStatus = async () => {
