@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -40,6 +39,7 @@ interface DatabaseProject {
   is_draft: boolean;
   is_published: boolean;
   published_page_id?: string;
+  project_id: string;
 }
 
 interface ProjectManagerProps {
