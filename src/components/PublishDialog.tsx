@@ -143,7 +143,7 @@ export const PublishDialog = ({
       const titleMatch = project.html.match(/<title[^>]*>([^<]+)<\/title>/i);
       const title = titleMatch ? titleMatch[1] : project.name;
 
-      const publishedPageData = {
+      const pageDataToPublish = {
         title,
         html_content: project.html,
         updated_at: new Date().toISOString(),
@@ -151,12 +151,12 @@ export const PublishDialog = ({
         custom_domain: userDomain
       };
 
-      console.log('Republishing page data:', publishedPageData);
+      console.log('Republishing page data:', pageDataToPublish);
 
       // Update existing published page
       const result = await supabase
         .from('published_pages')
-        .update(publishedPageData)
+        .update(pageDataToPublish)
         .eq('project_id', project.id)
         .eq('slug', slug)
         .eq('user_id', user.id)
@@ -269,7 +269,7 @@ export const PublishDialog = ({
       const titleMatch = project.html.match(/<title[^>]*>([^<]+)<\/title>/i);
       const title = titleMatch ? titleMatch[1] : project.name;
 
-      const publishedPageData = {
+      const pageDataToPublish = {
         slug,
         title,
         html_content: project.html,
@@ -279,7 +279,7 @@ export const PublishDialog = ({
         custom_domain: userDomain
       };
 
-      console.log('Publishing page data:', publishedPageData);
+      console.log('Publishing page data:', pageDataToPublish);
 
       // Check if this project already has a published page
       const { data: existingProjectPage, error: existingError } = await supabase
@@ -294,7 +294,7 @@ export const PublishDialog = ({
         // Update existing published page
         result = await supabase
           .from('published_pages')
-          .update(publishedPageData)
+          .update(pageDataToPublish)
           .eq('id', existingProjectPage.id)
           .select()
           .single();
@@ -302,7 +302,7 @@ export const PublishDialog = ({
         // Create new published page
         result = await supabase
           .from('published_pages')
-          .insert(publishedPageData)
+          .insert(pageDataToPublish)
           .select()
           .single();
       }
