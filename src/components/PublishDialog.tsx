@@ -528,7 +528,8 @@ export const PublishDialog = ({
                 {(isUpdatingExisting || mode === "change-slug") && mode !== "change-slug" && (
                   <Button 
                     onClick={resetToNewPublish}
-                    className="w-full bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white shadow-lg transition-all duration-300 transform hover:scale-105 px-8 py-3 text-base font-bold rounded-xl"
+                    variant="outline"
+                    className="w-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
                   >
                     פרסם בסיומת חדשה
                   </Button>
@@ -561,7 +562,8 @@ export const PublishDialog = ({
                   />
                   <Button 
                     onClick={copyLink}
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all duration-300 transform hover:scale-105 px-6 py-2 font-bold rounded-xl"
+                    variant="outline"
+                    className="border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white transition-all duration-200 px-4"
                   >
                     <Copy size={16} />
                   </Button>
@@ -579,7 +581,8 @@ export const PublishDialog = ({
                 
                 <Button 
                   onClick={shareLink}
-                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg transition-all duration-300 transform hover:scale-105 font-bold py-3 rounded-xl"
+                  variant="outline"
+                  className="border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white transition-all duration-300 transform hover:scale-105 font-bold py-3 rounded-xl"
                 >
                   <Share2 size={18} className="mr-2" />
                   שתף
@@ -598,7 +601,8 @@ export const PublishDialog = ({
 
               <Button 
                 onClick={resetToNewPublish}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all duration-300 transform hover:scale-105 px-8 py-3 text-base font-bold rounded-xl"
+                variant="outline"
+                className="w-full border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 font-medium"
               >
                 שנה סיומת
               </Button>
