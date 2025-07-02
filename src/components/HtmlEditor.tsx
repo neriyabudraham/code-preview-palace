@@ -30,6 +30,7 @@ export const HtmlEditor = () => {
   
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef<string>("");
+  const tempSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get user-specific localStorage keys
   const getUserProjectsKey = useCallback(() => {
@@ -95,7 +96,7 @@ export const HtmlEditor = () => {
     }
   }, [user]);
 
-  // Save temporary work when filename changes
+  // Enhanced temporary work saving with immediate save and debounced frequent saves
   const saveTempWork = useCallback(() => {
     if (fileName.trim() || htmlCode.trim()) {
       const tempWork = {
@@ -105,14 +106,20 @@ export const HtmlEditor = () => {
         userId: user?.id
       };
       localStorage.setItem(getUserTempWorkKey(), JSON.stringify(tempWork));
+      console.log('Temporary work saved:', tempWork);
     }
   }, [fileName, htmlCode, getUserTempWorkKey, user]);
 
-  // Save draft only when exiting without saving
+  // Save draft - enhanced version with better handling
   const saveDraftOnExit = useCallback(() => {
-    if (hasUnsavedChanges && (htmlCode.trim() || fileName.trim())) {
-      // Generate default name for draft
-      const draftFileName = generateDefaultDraftFileName();
+    console.log('Checking if should save draft on exit...');
+    console.log('Has unsaved changes:', hasUnsavedChanges);
+    console.log('HTML code length:', htmlCode.length);
+    console.log('File name length:', fileName.length);
+    
+    if (htmlCode.trim() || fileName.trim()) {
+      // Always save current work as draft when exiting
+      const draftFileName = fileName.trim() || generateDefaultDraftFileName();
       
       const draft = {
         id: currentProjectId || 'draft_' + Date.now(),
@@ -122,29 +129,101 @@ export const HtmlEditor = () => {
         isDraft: true,
         userId: user?.id
       };
+      
       localStorage.setItem(getUserDraftKey(), JSON.stringify(draft));
       console.log('Draft saved on exit:', draft);
+      
+      // Also save to temp work
+      saveTempWork();
     }
-  }, [htmlCode, fileName, currentProjectId, hasUnsavedChanges, getUserDraftKey, generateDefaultDraftFileName, user]);
+  }, [htmlCode, fileName, currentProjectId, getUserDraftKey, generateDefaultDraftFileName, user, saveTempWork]);
 
   // Set up beforeunload event to save draft when leaving
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      console.log('Before unload triggered');
       saveDraftOnExit();
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-        e.returnValue = '';
+    };
+
+    // Also handle visibility change (when switching tabs)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        console.log('Tab hidden - saving draft');
+        saveDraftOnExit();
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [saveDraftOnExit, hasUnsavedChanges]);
+    // Handle page hide (when navigating away)
+    const handlePageHide = () => {
+      console.log('Page hide - saving draft');
+      saveDraftOnExit();
+    };
 
-  // Save temporary work when content changes
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, [saveDraftOnExit]);
+
+  // Enhanced temp work saving with debouncing
   useEffect(() => {
-    saveTempWork();
+    // Clear existing timeout
+    if (tempSaveTimeoutRef.current) {
+      clearTimeout(tempSaveTimeoutRef.current);
+    }
+
+    // Set new timeout for temp save (500ms after user stops typing)
+    tempSaveTimeoutRef.current = setTimeout(() => {
+      saveTempWork();
+    }, 500);
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (tempSaveTimeoutRef.current) {
+        clearTimeout(tempSaveTimeoutRef.current);
+      }
+    };
   }, [fileName, htmlCode, saveTempWork]);
+
+  // Load draft and temporary work on component mount
+  useEffect(() => {
+    if (!user) return;
+
+    // Load existing draft
+    const savedDraft = localStorage.getItem(getUserDraftKey());
+    if (savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft);
+        console.log('Found existing draft:', draft);
+        setCurrentDraft(draft);
+      } catch (error) {
+        console.error('Error loading draft:', error);
+      }
+    }
+
+    // Load temporary work
+    const tempWork = localStorage.getItem(getUserTempWorkKey());
+    if (tempWork && !savedDraft) {
+      try {
+        const temp = JSON.parse(tempWork);
+        console.log('Found temporary work:', temp);
+        if (temp.htmlCode || temp.fileName) {
+          setHtmlCode(temp.htmlCode || '');
+          setFileName(temp.fileName || '');
+          setHasUnsavedChanges(true);
+        }
+      } catch (error) {
+        console.error('Error loading temporary work:', error);
+      }
+    }
+
+    lastSavedContentRef.current = "";
+  }, [user, getUserDraftKey, getUserTempWorkKey]);
 
   // Auto-save function - only for existing projects
   const autoSave = useCallback(async () => {
@@ -275,8 +354,6 @@ export const HtmlEditor = () => {
     };
   }, [htmlCode, fileName, autoSave, user, isEditingExisting]);
 
-  // ... keep existing code (useEffect for loading projects and initialization)
-
   const handleCodeChange = (newCode: string) => {
     setHtmlCode(newCode);
   };
@@ -287,11 +364,11 @@ export const HtmlEditor = () => {
 
   const handleNewPage = () => {
     // Save current work as draft if there are unsaved changes
-    if (hasUnsavedChanges) {
+    if (hasUnsavedChanges || htmlCode.trim() || fileName.trim()) {
       saveDraftOnExit();
       toast({
-        title: "טיוטה נשמרה",
-        description: "העבודה הנוכחית נשמרה כטיוטה",
+        title: "העבודה הקודמת נשמרה",
+        description: "התוכן הקודם נשמר כטיוטה",
       });
     }
     
@@ -344,7 +421,7 @@ export const HtmlEditor = () => {
       return;
     }
 
-    // Require filename before saving
+    // Show error message if no filename is provided - but allow the save attempt
     if (!fileName.trim()) {
       toast({
         title: "שם קובץ נדרש",
@@ -585,8 +662,8 @@ export const HtmlEditor = () => {
     }
   };
 
-  // Save button requires filename
-  const canSave = !!user && fileName.trim();
+  // Save button is now always enabled for logged in users
+  const canSave = !!user;
   const canPublish = lastSavedProject && user;
 
   // Show login message if user is not logged in
@@ -612,7 +689,7 @@ export const HtmlEditor = () => {
             <Input
               value={fileName}
               onChange={(e) => handleFileNameChange(e.target.value)}
-              placeholder="שם הקובץ (נדרש לשמירה)..."
+              placeholder="שם הקובץ..."
               className="pr-12 bg-slate-800/70 border-slate-600 text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 h-12 text-lg"
             />
           </div>
@@ -749,11 +826,9 @@ export const HtmlEditor = () => {
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
                 💾 הזן שם קובץ ולחץ שמור כדי לשמור את הפרויקט
-                {hasUnsavedChanges && (
-                  <Badge variant="outline" className="mr-2 border-yellow-400 text-yellow-400">
-                    יש שינויים לא שמורים - יישמרו כטיוטה בעת יציאה
-                  </Badge>
-                )}
+                <Badge variant="outline" className="mr-2 border-green-400 text-green-400">
+                  נשמר אוטומטית כטיוטה
+                </Badge>
               </div>
             </div>
           )}
