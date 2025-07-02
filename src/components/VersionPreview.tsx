@@ -28,7 +28,7 @@ export const VersionPreview = ({ open, onOpenChange, version, onRestore }: Versi
             <div className="flex gap-2">
               <Button 
                 onClick={handleRestore}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all duration-200"
+                variant="success"
               >
                 <RotateCcw size={16} className="mr-2" />
                 שחזר גירסה זו

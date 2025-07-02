@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { HtmlEditor } from "@/components/HtmlEditor";
 import { ProjectManager } from "@/components/ProjectManager";
@@ -87,9 +86,8 @@ const Index = () => {
               {isAdmin && (
                 <Button
                   onClick={handleAdminClick}
-                  variant="outline"
+                  variant="purple"
                   size="sm"
-                  className="border-purple-600 text-purple-400 hover:bg-purple-600"
                 >
                   <Shield className="w-4 h-4 mr-2" />
                   ניהול

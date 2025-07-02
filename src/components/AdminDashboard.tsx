@@ -1,20 +1,22 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { AdminUsersList } from "./AdminUsersList";
 import { OnlineUsersTable } from "./OnlineUsersTable";
 import { WebhookLogsList } from "./WebhookLogsList";
 import { AdminAnalytics } from "./AdminAnalytics";
 import { UsersManagement } from "./UsersManagement";
-import { Shield, Users, Globe, Activity, BarChart3, UserCog } from "lucide-react";
+import { Shield, Users, Globe, Activity, BarChart3, UserCog, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 export function AdminDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -50,6 +52,10 @@ export function AdminDashboard() {
     checkAdminStatus();
   }, [user, toast]);
 
+  const handleBackToHome = () => {
+    navigate('/');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -78,6 +84,16 @@ export function AdminDashboard() {
     <div className="min-h-screen bg-gray-900 text-white p-6">
       <div className="container mx-auto">
         <div className="mb-8">
+          <div className="flex items-center gap-4 mb-4">
+            <Button 
+              onClick={handleBackToHome}
+              variant="outline"
+              className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white"
+            >
+              <ArrowLeft size={16} className="mr-2" />
+              חזור לדף הראשי
+            </Button>
+          </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
             לוח בקרה למנהלים
           </h1>
