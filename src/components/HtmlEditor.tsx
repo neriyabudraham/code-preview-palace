@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,11 +59,28 @@ export const HtmlEditor = () => {
   }, [currentProjectId, getUserProjectsKey]);
 
   // Check if current project is published
-  const checkIfProjectIsPublished = useCallback((projectId: string) => {
-    const savedProjects = JSON.parse(localStorage.getItem(getUserProjectsKey()) || "[]");
-    const project = savedProjects.find((p: any) => p.id === projectId);
-    return project && (project.publishedUrl || project.customSlug);
-  }, [getUserProjectsKey]);
+  const checkIfProjectIsPublished = useCallback(async (projectId: string) => {
+    if (!user || !projectId) return false;
+
+    try {
+      const { data: publishedPage, error } = await supabase
+        .from('published_pages')
+        .select('slug, custom_domain')
+        .eq('project_id', projectId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking publish status:', error);
+        return false;
+      }
+
+      return !!publishedPage;
+    } catch (error) {
+      console.error('Error in checkIfProjectIsPublished:', error);
+      return false;
+    }
+  }, [user]);
 
   // Save temporary work when filename changes
   const saveTempWork = useCallback(() => {
@@ -114,7 +130,7 @@ export const HtmlEditor = () => {
     saveTempWork();
   }, [fileName, htmlCode, saveTempWork]);
 
-  // Auto-save function
+  // Auto-save function with version creation
   const autoSave = useCallback(async () => {
     if (!user) {
       console.log('No user logged in, skipping auto-save');
@@ -153,8 +169,8 @@ export const HtmlEditor = () => {
         if (projectIndex !== -1) {
           const existingProject = savedProjects[projectIndex];
           
-          // Create version history entry only if there's a significant change
-          if (existingProject.html !== htmlCode) {
+          // Create version history entry if there's a significant change
+          if (existingProject.html !== htmlCode && existingProject.html.trim()) {
             if (!existingProject.versions) {
               existingProject.versions = [];
             }
@@ -163,7 +179,7 @@ export const HtmlEditor = () => {
             existingProject.versions.unshift({
               id: Date.now().toString() + "_v",
               html: existingProject.html,
-              savedAt: existingProject.updatedAt,
+              savedAt: existingProject.updatedAt || existingProject.createdAt,
               version: (existingProject.versions.length || 0) + 1
             });
             
@@ -171,6 +187,8 @@ export const HtmlEditor = () => {
             if (existingProject.versions.length > 10) {
               existingProject.versions = existingProject.versions.slice(0, 10);
             }
+            
+            console.log(`Created new version ${existingProject.versions[0].version} for project ${existingProject.name}`);
           }
           
           // Update current project
@@ -183,7 +201,8 @@ export const HtmlEditor = () => {
           };
           
           // Check if project is published
-          setIsProjectPublished(checkIfProjectIsPublished(currentProjectId));
+          const publishStatus = await checkIfProjectIsPublished(currentProjectId);
+          setIsProjectPublished(publishStatus);
         }
       } else {
         // Create new project for auto-save
@@ -201,6 +220,8 @@ export const HtmlEditor = () => {
         setCurrentProjectId(project.id);
         setIsEditingExisting(true);
         setIsProjectPublished(false);
+        
+        console.log(`Created new project: ${project.name} with ID: ${project.id}`);
       }
 
       localStorage.setItem(getUserProjectsKey(), JSON.stringify(savedProjects));
@@ -266,16 +287,22 @@ export const HtmlEditor = () => {
     if (editingProject) {
       try {
         const project = JSON.parse(editingProject);
+        console.log("Loading project for editing:", project);
+        
         // Verify the project belongs to the current user
         if (!user || project.userId === user.id) {
-          setHtmlCode(project.html);
-          setFileName(project.name);
+          setHtmlCode(project.html || "");
+          setFileName(project.name || "");
           setCurrentProjectId(project.id);
           setIsEditingExisting(true);
           setLastSavedProject(project);
-          setIsProjectPublished(checkIfProjectIsPublished(project.id));
-          lastSavedContentRef.current = project.html;
+          
+          // Check publish status
+          checkIfProjectIsPublished(project.id).then(setIsProjectPublished);
+          
+          lastSavedContentRef.current = project.html || "";
           setHasUnsavedChanges(false);
+          
           // Clear the sessionStorage after loading
           sessionStorage.removeItem("editingProject");
           
@@ -287,6 +314,11 @@ export const HtmlEditor = () => {
         }
       } catch (error) {
         console.error("Error loading project:", error);
+        toast({
+          title: "שגיאה",
+          description: "שגיאה בטעינת הפרויקט",
+          variant: "destructive"
+        });
       }
     }
 
@@ -436,7 +468,8 @@ export const HtmlEditor = () => {
     const savedProject = updatedProjects.find((p: any) => p.id === currentProjectId || (p.name === finalFileName && p.html === htmlCode));
     if (savedProject) {
       setLastSavedProject(savedProject);
-      setIsProjectPublished(checkIfProjectIsPublished(savedProject.id));
+      const publishStatus = await checkIfProjectIsPublished(savedProject.id);
+      setIsProjectPublished(publishStatus);
     }
     
     toast({
@@ -496,6 +529,14 @@ export const HtmlEditor = () => {
       return;
     }
     setShowPublishDialog(true);
+  };
+
+  const handlePublishComplete = async () => {
+    // Refresh publish status after successful publish
+    if (currentProjectId) {
+      const publishStatus = await checkIfProjectIsPublished(currentProjectId);
+      setIsProjectPublished(publishStatus);
+    }
   };
 
   const getPublishButtonText = () => {
@@ -675,6 +716,7 @@ export const HtmlEditor = () => {
           open={showPublishDialog} 
           onOpenChange={setShowPublishDialog}
           project={lastSavedProject}
+          onPublishComplete={handlePublishComplete}
         />
       )}
     </div>

@@ -27,7 +27,9 @@ interface LocalProject {
   updatedAt: string;
   versions?: ProjectVersion[];
   publishedUrl?: string;
+  customSlug?: string;
   isDraft?: boolean;
+  userId?: string;
 }
 
 interface DatabaseProject {
@@ -40,6 +42,7 @@ interface DatabaseProject {
   is_published: boolean;
   published_page_id?: string;
   project_id: string;
+  user_id: string;
 }
 
 interface ProjectManagerProps {
@@ -85,11 +88,34 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
         console.log("Loaded database projects:", dbProjects);
       }
 
+      // Load published pages to get publish status
+      const { data: publishedPages, error: publishError } = await supabase
+        .from('published_pages')
+        .select('project_id, slug, title, custom_domain')
+        .eq('user_id', user.id);
+
+      if (publishError) {
+        console.error('Error loading published pages:', publishError);
+      }
+
+      // Create a map of published projects
+      const publishedMap = new Map();
+      if (publishedPages) {
+        publishedPages.forEach(page => {
+          const baseUrl = page.custom_domain ? `https://${page.custom_domain}` : 'https://html-to-site.lovable.app';
+          publishedMap.set(page.project_id, {
+            publishedUrl: `${baseUrl}/${page.slug}`,
+            customSlug: page.slug
+          });
+        });
+      }
+
       // Combine and format projects
       const allProjects: LocalProject[] = [];
 
-      // Add local projects
+      // Add local projects with publish status
       localProjects.forEach((project: any) => {
+        const publishInfo = publishedMap.get(project.id);
         allProjects.push({
           id: project.id,
           name: project.name,
@@ -97,18 +123,21 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
           createdAt: project.createdAt,
           updatedAt: project.updatedAt,
           versions: project.versions || [],
-          publishedUrl: project.publishedUrl,
-          isDraft: false
+          publishedUrl: publishInfo?.publishedUrl || project.publishedUrl,
+          customSlug: publishInfo?.customSlug || project.customSlug,
+          isDraft: false,
+          userId: user.id
         });
       });
 
-      // Add database projects
+      // Add database projects with publish status
       if (dbProjects) {
         dbProjects.forEach((dbProject: DatabaseProject) => {
           // Check if this project already exists in local storage
           const existsInLocal = allProjects.some(p => p.id === dbProject.project_id);
           
           if (!existsInLocal) {
+            const publishInfo = publishedMap.get(dbProject.project_id);
             allProjects.push({
               id: dbProject.project_id,
               name: dbProject.name,
@@ -117,7 +146,9 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
               updatedAt: dbProject.updated_at,
               versions: [],
               isDraft: dbProject.is_draft,
-              publishedUrl: dbProject.is_published ? "published" : undefined
+              publishedUrl: publishInfo?.publishedUrl,
+              customSlug: publishInfo?.customSlug,
+              userId: user.id
             });
           }
         });
@@ -187,10 +218,18 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
   };
 
   const editProject = (project: LocalProject) => {
-    // Store the project to edit in sessionStorage so the editor can pick it up
-    sessionStorage.setItem("editingProject", JSON.stringify(project));
+    // Store the complete project data to edit in sessionStorage so the editor can pick it up
+    const projectToEdit = {
+      ...project,
+      userId: user?.id // Ensure user ID is included
+    };
+    
+    console.log("Storing project for editing:", projectToEdit);
+    sessionStorage.setItem("editingProject", JSON.stringify(projectToEdit));
+    
     // Call the callback to switch tabs
     onEditProject();
+    
     toast({
       title: "עבר לעריכה",
       description: `הפרויקט "${project.name}" נטען לעריכה`,
@@ -208,7 +247,9 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
       updatedAt: new Date().toISOString(),
       versions: [], // Reset versions for duplicate
       isDraft: false,
-      publishedUrl: undefined
+      publishedUrl: undefined,
+      customSlug: undefined,
+      userId: user.id
     };
     
     try {
@@ -253,6 +294,11 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
   const handlePublish = (project: LocalProject) => {
     setPublishingProject(project);
     setShowPublishDialog(true);
+  };
+
+  const handlePublishComplete = () => {
+    // Reload projects to get updated publish status
+    loadProjects();
   };
 
   const previewVersion = (project: LocalProject, version: ProjectVersion) => {
@@ -371,7 +417,7 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => {
             const { title } = getPreviewText(project.html);
-            const isPublished = !!project.publishedUrl;
+            const isPublished = !!(project.publishedUrl || project.customSlug);
             const isDraft = project.isDraft;
             
             return (
@@ -555,6 +601,7 @@ export const ProjectManager = ({ onEditProject }: ProjectManagerProps) => {
           open={showPublishDialog}
           onOpenChange={setShowPublishDialog}
           project={publishingProject}
+          onPublishComplete={handlePublishComplete}
         />
       )}
     </div>

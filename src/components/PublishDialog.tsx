@@ -12,9 +12,10 @@ interface PublishDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   project: any;
+  onPublishComplete?: () => void;
 }
 
-export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProps) => {
+export const PublishDialog = ({ open, onOpenChange, project, onPublishComplete }: PublishDialogProps) => {
   const [publishedUrl, setPublishedUrl] = useState("");
   const [customSlug, setCustomSlug] = useState("");
   const [isPublishing, setIsPublishing] = useState(false);
@@ -150,11 +151,19 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
       }
       
       // Update project in localStorage
-      const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
-      const projectIndex = savedProjects.findIndex((p: any) => p.id === project.id);
-      if (projectIndex !== -1) {
-        savedProjects[projectIndex].publishedAt = new Date().toISOString();
-        localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
+      if (user) {
+        const userProjectsKey = `htmlProjects_${user.id}`;
+        const savedProjects = JSON.parse(localStorage.getItem(userProjectsKey) || "[]");
+        const projectIndex = savedProjects.findIndex((p: any) => p.id === project.id);
+        if (projectIndex !== -1) {
+          savedProjects[projectIndex].publishedAt = new Date().toISOString();
+          localStorage.setItem(userProjectsKey, JSON.stringify(savedProjects));
+        }
+      }
+      
+      // Call the callback to notify parent components
+      if (onPublishComplete) {
+        onPublishComplete();
       }
       
       toast({
@@ -289,13 +298,21 @@ export const PublishDialog = ({ open, onOpenChange, project }: PublishDialogProp
       setPublishedUrl(url);
       
       // Update project in localStorage
-      const savedProjects = JSON.parse(localStorage.getItem("htmlProjects") || "[]");
-      const projectIndex = savedProjects.findIndex((p: any) => p.id === project.id);
-      if (projectIndex !== -1) {
-        savedProjects[projectIndex].publishedUrl = url;
-        savedProjects[projectIndex].customSlug = slug;
-        savedProjects[projectIndex].publishedAt = new Date().toISOString();
-        localStorage.setItem("htmlProjects", JSON.stringify(savedProjects));
+      if (user) {
+        const userProjectsKey = `htmlProjects_${user.id}`;
+        const savedProjects = JSON.parse(localStorage.getItem(userProjectsKey) || "[]");
+        const projectIndex = savedProjects.findIndex((p: any) => p.id === project.id);
+        if (projectIndex !== -1) {
+          savedProjects[projectIndex].publishedUrl = url;
+          savedProjects[projectIndex].customSlug = slug;
+          savedProjects[projectIndex].publishedAt = new Date().toISOString();
+          localStorage.setItem(userProjectsKey, JSON.stringify(savedProjects));
+        }
+      }
+      
+      // Call the callback to notify parent components
+      if (onPublishComplete) {
+        onPublishComplete();
       }
       
       const actionText = isUpdatingExisting ? "עודכן" : "פורסם";
