@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { CodeEditor } from "./CodeEditor";
 import { HtmlPreview } from "./HtmlPreview";
 import { PublishDialog } from "./PublishDialog";
-import { Save, Play, RotateCcw, Copy, Share2, FileText, Trash2 } from "lucide-react";
+import { Save, Play, RotateCcw, Copy, Share2, FileText, Trash2, ExternalLink, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,6 +22,7 @@ export const HtmlEditor = () => {
   const [lastSavedProject, setLastSavedProject] = useState<any>(null);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [isProjectPublished, setIsProjectPublished] = useState(false);
+  const [publishedPageData, setPublishedPageData] = useState<any>(null);
   const [currentDraft, setCurrentDraft] = useState<any>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const { toast } = useToast();
@@ -59,26 +60,37 @@ export const HtmlEditor = () => {
     return finalName;
   }, [currentProjectId, getUserProjectsKey]);
 
-  // Check if current project is published
+  // Check if current project is published and get publish data
   const checkIfProjectIsPublished = useCallback(async (projectId: string) => {
-    if (!user || !projectId) return false;
+    if (!user || !projectId) {
+      setIsProjectPublished(false);
+      setPublishedPageData(null);
+      return false;
+    }
 
     try {
       const { data: publishedPage, error } = await supabase
         .from('published_pages')
-        .select('slug, custom_domain')
+        .select('slug, custom_domain, title, created_at, updated_at')
         .eq('project_id', projectId)
         .eq('user_id', user.id)
         .maybeSingle();
 
       if (error) {
         console.error('Error checking publish status:', error);
+        setIsProjectPublished(false);
+        setPublishedPageData(null);
         return false;
       }
 
-      return !!publishedPage;
+      const isPublished = !!publishedPage;
+      setIsProjectPublished(isPublished);
+      setPublishedPageData(publishedPage);
+      return isPublished;
     } catch (error) {
       console.error('Error in checkIfProjectIsPublished:', error);
+      setIsProjectPublished(false);
+      setPublishedPageData(null);
       return false;
     }
   }, [user]);
@@ -221,6 +233,7 @@ export const HtmlEditor = () => {
         setCurrentProjectId(project.id);
         setIsEditingExisting(true);
         setIsProjectPublished(false);
+        setPublishedPageData(null);
         
         console.log(`Created new project: ${project.name} with ID: ${project.id}`);
       }
@@ -299,7 +312,7 @@ export const HtmlEditor = () => {
           setLastSavedProject(project);
           
           // Check publish status
-          checkIfProjectIsPublished(project.id).then(setIsProjectPublished);
+          checkIfProjectIsPublished(project.id);
           
           lastSavedContentRef.current = project.html || "";
           setHasUnsavedChanges(false);
@@ -532,19 +545,75 @@ export const HtmlEditor = () => {
     setShowPublishDialog(true);
   };
 
+  const handleUpdatePublish = async () => {
+    if (!user || !currentProjectId || !publishedPageData) {
+      toast({
+        title: "שגיאה",
+        description: "שגיאה בעדכון הפרסום",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const titleMatch = htmlCode.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const title = titleMatch ? titleMatch[1] : fileName || "ללא כותרת";
+
+      const { error } = await supabase
+        .from('published_pages')
+        .update({
+          title,
+          html_content: htmlCode,
+          updated_at: new Date().toISOString()
+        })
+        .eq('project_id', currentProjectId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update project in localStorage
+      const savedProjects = JSON.parse(localStorage.getItem(getUserProjectsKey()) || "[]");
+      const projectIndex = savedProjects.findIndex((p: any) => p.id === currentProjectId);
+      if (projectIndex !== -1) {
+        savedProjects[projectIndex].publishedAt = new Date().toISOString();
+        localStorage.setItem(getUserProjectsKey(), JSON.stringify(savedProjects));
+      }
+
+      // Refresh publish data
+      await checkIfProjectIsPublished(currentProjectId);
+
+      toast({
+        title: "עודכן בהצלחה! 🎉",
+        description: "הדף המפורסם עודכן עם התוכן החדש",
+      });
+
+    } catch (error) {
+      console.error("Update publish error:", error);
+      toast({
+        title: "שגיאה בעדכון",
+        description: "אירעה שגיאה בעת עדכון הדף המפורסם",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleOpenPublishedPage = () => {
+    if (publishedPageData) {
+      const url = publishedPageData.custom_domain 
+        ? `https://${publishedPageData.custom_domain}/${publishedPageData.slug}`
+        : `https://html-to-site.lovable.app/${publishedPageData.slug}`;
+      window.open(url, '_blank');
+    }
+  };
+
   const handlePublishComplete = async () => {
     // Refresh publish status after successful publish
     if (currentProjectId) {
       const publishStatus = await checkIfProjectIsPublished(currentProjectId);
       setIsProjectPublished(publishStatus);
     }
-  };
-
-  const getPublishButtonText = () => {
-    if (isProjectPublished) {
-      return "פרסום מחדש";
-    }
-    return "פרסום";
   };
 
   // Save button is always enabled when user is logged in
@@ -607,14 +676,41 @@ export const HtmlEditor = () => {
             {isAutoSaving ? "שומר..." : "שמור"}
           </Button>
           
-          {canPublish && (
+          {canPublish && !isProjectPublished && (
             <Button 
               onClick={handlePublish} 
               className="bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 border-0 text-white shadow-lg hover:shadow-xl transition-all duration-200 h-12 px-8 font-semibold text-base"
             >
               <Share2 size={18} className="mr-2" />
-              {getPublishButtonText()}
+              פרסום
             </Button>
+          )}
+
+          {canPublish && isProjectPublished && publishedPageData && (
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleUpdatePublish} 
+                className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 border-0 text-white shadow-lg hover:shadow-xl transition-all duration-200 h-12 px-6 font-semibold text-base"
+              >
+                <RefreshCw size={18} className="mr-2" />
+                עדכן פרסום
+              </Button>
+              <Button 
+                onClick={handleOpenPublishedPage} 
+                variant="outline"
+                className="border-slate-600 bg-slate-800/50 text-slate-300 hover:bg-slate-700 hover:text-white hover:border-slate-500 transition-all duration-200 h-12 px-6 font-medium"
+              >
+                <ExternalLink size={18} className="mr-2" />
+                פתח דף
+              </Button>
+              <Button 
+                onClick={handlePublish} 
+                variant="outline"
+                className="border-slate-600 bg-slate-800/50 text-slate-300 hover:bg-slate-700 hover:text-white hover:border-slate-500 transition-all duration-200 h-12 px-6 font-medium"
+              >
+                שנה כתובת
+              </Button>
+            </div>
           )}
           
           <Button 
