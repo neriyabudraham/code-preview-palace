@@ -45,6 +45,42 @@ export type Database = {
         }
         Relationships: []
       }
+      project_versions: {
+        Row: {
+          created_at: string
+          html_content: string
+          id: string
+          is_draft: boolean
+          name: string
+          project_id: string
+          updated_at: string
+          user_id: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          html_content: string
+          id?: string
+          is_draft?: boolean
+          name: string
+          project_id: string
+          updated_at?: string
+          user_id: string
+          version_number: number
+        }
+        Update: {
+          created_at?: string
+          html_content?: string
+          id?: string
+          is_draft?: boolean
+          name?: string
+          project_id?: string
+          updated_at?: string
+          user_id?: string
+          version_number?: number
+        }
+        Relationships: []
+      }
       published_pages: {
         Row: {
           created_at: string

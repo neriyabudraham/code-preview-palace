@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,11 +5,13 @@ import { Card } from "@/components/ui/card";
 import { CodeEditor } from "./CodeEditor";
 import { HtmlPreview } from "./HtmlPreview";
 import { PublishDialog } from "./PublishDialog";
-import { Save, Play, RotateCcw, Copy, Share2, FileText, Trash2 } from "lucide-react";
+import { VersionHistory } from "./VersionHistory";
+import { Save, Play, RotateCcw, Copy, Share2, FileText, Trash2, History } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserProjects } from "@/hooks/useUserProjects";
+import { useProjectVersions } from "@/hooks/useProjectVersions";
 import { UserProject } from "@/services/userProjectsService";
 
 const EMPTY_HTML = "";
@@ -23,6 +24,7 @@ export const HtmlEditor = () => {
   const [isEditingExisting, setIsEditingExisting] = useState(false);
   const [lastSavedProject, setLastSavedProject] = useState<any>(null);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [isProjectPublished, setIsProjectPublished] = useState(false);
   const [currentDraft, setCurrentDraft] = useState<UserProject | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -31,10 +33,12 @@ export const HtmlEditor = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { projects, saveProject, saveDraft, isSaving } = useUserProjects();
+  const { createVersion } = useProjectVersions(currentProjectId);
   
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const localSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef<string>("");
+  const lastVersionSaveRef = useRef<string>("");
 
   // Save to local storage
   const saveToLocalStorage = useCallback(() => {
@@ -105,14 +109,13 @@ export const HtmlEditor = () => {
     return project && project.is_published;
   }, [projects]);
 
-  // Auto-save to database function
+  // Enhanced auto-save function with version history
   const autoSave = useCallback(async () => {
     if (!user || !fileName.trim()) {
       console.log('No user logged in or no filename, skipping database auto-save');
       return;
     }
 
-    // Use default filename if no filename is provided
     const finalFileName = fileName.trim() || generateDefaultFileName();
 
     // Don't auto-save if content hasn't changed
@@ -153,6 +156,12 @@ export const HtmlEditor = () => {
           setFileName(finalFileName);
         }
         
+        // Create version history entry only for significant changes
+        if (lastVersionSaveRef.current !== htmlCode && htmlCode.trim().length > 0) {
+          await createVersion(finalFileName, htmlCode, false);
+          lastVersionSaveRef.current = htmlCode;
+        }
+        
         // Clear draft if it exists
         setCurrentDraft(null);
         
@@ -164,7 +173,7 @@ export const HtmlEditor = () => {
     } catch (error) {
       console.error("Database auto-save failed:", error);
     }
-  }, [htmlCode, fileName, currentProjectId, user, saveProject, generateDefaultFileName, projects, toast, clearLocalStorage]);
+  }, [htmlCode, fileName, currentProjectId, user, saveProject, generateDefaultFileName, projects, toast, clearLocalStorage, createVersion]);
 
   // Track changes to mark unsaved changes and trigger local storage save
   useEffect(() => {
@@ -221,6 +230,7 @@ export const HtmlEditor = () => {
           setLastSavedProject(project);
           setIsProjectPublished(checkIfProjectIsPublished(project.id));
           lastSavedContentRef.current = project.html;
+          lastVersionSaveRef.current = project.html;
           setHasUnsavedChanges(false);
           // Clear the sessionStorage after loading
           sessionStorage.removeItem("editingProject");
@@ -266,6 +276,7 @@ export const HtmlEditor = () => {
       setLastSavedProject(null);
       setIsProjectPublished(false);
       lastSavedContentRef.current = "";
+      lastVersionSaveRef.current = "";
       setHasUnsavedChanges(false);
     }
   }, [toast, checkIfProjectIsPublished, user, projects, loadFromLocalStorage, clearLocalStorage]);
@@ -341,6 +352,7 @@ export const HtmlEditor = () => {
     setLastSavedProject(null);
     setIsProjectPublished(false);
     lastSavedContentRef.current = "";
+    lastVersionSaveRef.current = "";
     setHasUnsavedChanges(false);
     
     toast({
@@ -424,6 +436,7 @@ export const HtmlEditor = () => {
     setLastSavedProject(null);
     setIsProjectPublished(false);
     lastSavedContentRef.current = "";
+    lastVersionSaveRef.current = "";
     setHasUnsavedChanges(true);
     
     // Clear local storage since we're creating a new project
@@ -444,6 +457,7 @@ export const HtmlEditor = () => {
     setLastSavedProject(null);
     setIsProjectPublished(false);
     lastSavedContentRef.current = "";
+    lastVersionSaveRef.current = "";
     setHasUnsavedChanges(false);
     
     toast({
@@ -471,6 +485,18 @@ export const HtmlEditor = () => {
       return;
     }
     setShowPublishDialog(true);
+  };
+
+  // New function to handle version restoration
+  const handleRestoreVersion = (html: string, name: string) => {
+    setHtmlCode(html);
+    setFileName(name);
+    setHasUnsavedChanges(true);
+    
+    toast({
+      title: "גירסה שוחזרה",
+      description: `הגירסה "${name}" שוחזרה בהצלחה`,
+    });
   };
 
   const getPublishButtonText = () => {
@@ -539,6 +565,17 @@ export const HtmlEditor = () => {
             <Save size={18} className="mr-2" />
             {isSaving ? "שומר..." : "שמור"}
           </Button>
+
+          {currentProjectId && (
+            <Button 
+              onClick={() => setShowVersionHistory(true)} 
+              variant="outline"
+              className="border-slate-600 bg-slate-800/50 text-slate-300 hover:bg-slate-700 hover:text-white hover:border-slate-500 transition-all duration-200 h-12 px-6 font-medium"
+            >
+              <History size={18} className="mr-2" />
+              היסטוריה
+            </Button>
+          )}
           
           {canPublish && (
             <Button 
@@ -598,7 +635,7 @@ export const HtmlEditor = () => {
             <div className="bg-emerald-900/40 border border-emerald-700/50 rounded-xl p-4 text-emerald-200 text-sm flex-1 backdrop-blur-sm">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                💾 שמירה אוטומטית פעילה - נשמר במקומי + במאגר
+                💾 שמירה אוטומטית פעילה - נשמר במקומי + במאגר + היסטוריה
                 {isProjectPublished && (
                   <Badge variant="outline" className="mr-2 border-orange-400 text-orange-400">
                     מפורסם
@@ -657,6 +694,13 @@ export const HtmlEditor = () => {
           project={lastSavedProject}
         />
       )}
+
+      <VersionHistory
+        open={showVersionHistory}
+        onOpenChange={setShowVersionHistory}
+        projectId={currentProjectId}
+        onRestoreVersion={handleRestoreVersion}
+      />
     </div>
   );
 };
