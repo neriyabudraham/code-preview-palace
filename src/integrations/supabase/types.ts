@@ -11,28 +11,73 @@ export type Database = {
     Tables: {
       profiles: {
         Row: {
+          avatar_url: string | null
           created_at: string
           custom_domain: string | null
           domain_verified: boolean | null
           email: string | null
+          full_name: string | null
           id: string
+          provider: string | null
           updated_at: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           custom_domain?: string | null
           domain_verified?: boolean | null
           email?: string | null
+          full_name?: string | null
           id: string
+          provider?: string | null
           updated_at?: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           custom_domain?: string | null
           domain_verified?: boolean | null
           email?: string | null
+          full_name?: string | null
           id?: string
+          provider?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      project_versions: {
+        Row: {
+          created_at: string
+          html_content: string
+          id: string
+          is_draft: boolean
+          name: string
+          project_id: string
+          updated_at: string
+          user_id: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          html_content: string
+          id?: string
+          is_draft?: boolean
+          name: string
+          project_id: string
+          updated_at?: string
+          user_id: string
+          version_number: number
+        }
+        Update: {
+          created_at?: string
+          html_content?: string
+          id?: string
+          is_draft?: boolean
+          name?: string
+          project_id?: string
+          updated_at?: string
+          user_id?: string
+          version_number?: number
         }
         Relationships: []
       }
@@ -44,6 +89,7 @@ export type Database = {
           id: string
           project_id: string
           slug: string
+          slug_id: string | null
           title: string
           updated_at: string
           user_id: string | null
@@ -55,6 +101,7 @@ export type Database = {
           id?: string
           project_id: string
           slug: string
+          slug_id?: string | null
           title: string
           updated_at?: string
           user_id?: string | null
@@ -66,11 +113,59 @@ export type Database = {
           id?: string
           project_id?: string
           slug?: string
+          slug_id?: string | null
           title?: string
           updated_at?: string
           user_id?: string | null
         }
         Relationships: []
+      }
+      user_projects: {
+        Row: {
+          created_at: string
+          html_content: string
+          id: string
+          is_draft: boolean
+          is_published: boolean
+          name: string
+          project_id: string
+          published_page_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          html_content: string
+          id?: string
+          is_draft?: boolean
+          is_published?: boolean
+          name: string
+          project_id: string
+          published_page_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          html_content?: string
+          id?: string
+          is_draft?: boolean
+          is_published?: boolean
+          name?: string
+          project_id?: string
+          published_page_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_projects_published_page_id_fkey"
+            columns: ["published_page_id"]
+            isOneToOne: false
+            referencedRelation: "published_pages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
