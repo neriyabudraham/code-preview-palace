@@ -25,6 +25,7 @@ export const HtmlEditor = () => {
   const [publishedPageData, setPublishedPageData] = useState<any>(null);
   const [currentDraft, setCurrentDraft] = useState<any>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [publishDialogMode, setPublishDialogMode] = useState<"publish" | "change-slug">("publish");
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -626,6 +627,30 @@ export const HtmlEditor = () => {
       });
       return;
     }
+    setPublishDialogMode("publish");
+    setShowPublishDialog(true);
+  };
+
+  const handleChangeSlug = () => {
+    if (!user) {
+      toast({
+        title: "שגיאה",
+        description: "יש להתחבר כדי לשנות כתובת",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!lastSavedProject || !isProjectPublished) {
+      toast({
+        title: "שגיאה",
+        description: "הפרויקט צריך להיות פורסם כדי לשנות את הכתובת",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setPublishDialogMode("change-slug");
     setShowPublishDialog(true);
   };
 
@@ -788,7 +813,7 @@ export const HtmlEditor = () => {
                 פתח דף
               </Button>
               <Button 
-                onClick={handlePublish} 
+                onClick={handleChangeSlug} 
                 variant="outline"
                 className="border-slate-600 bg-slate-800/50 text-slate-300 hover:bg-slate-700 hover:text-white hover:border-slate-500 transition-all duration-200 h-12 px-6 font-medium"
               >
@@ -908,6 +933,8 @@ export const HtmlEditor = () => {
           open={showPublishDialog} 
           onOpenChange={setShowPublishDialog}
           project={lastSavedProject}
+          publishedPageData={publishedPageData}
+          mode={publishDialogMode}
           onPublishComplete={handlePublishComplete}
         />
       )}

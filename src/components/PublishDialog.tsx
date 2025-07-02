@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -12,10 +11,19 @@ interface PublishDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   project: any;
+  publishedPageData?: any;
+  mode?: "publish" | "change-slug";
   onPublishComplete?: () => void;
 }
 
-export const PublishDialog = ({ open, onOpenChange, project, onPublishComplete }: PublishDialogProps) => {
+export const PublishDialog = ({ 
+  open, 
+  onOpenChange, 
+  project, 
+  publishedPageData,
+  mode = "publish",
+  onPublishComplete 
+}: PublishDialogProps) => {
   const [publishedUrl, setPublishedUrl] = useState("");
   const [customSlug, setCustomSlug] = useState("");
   const [isPublishing, setIsPublishing] = useState(false);
@@ -58,26 +66,37 @@ export const PublishDialog = ({ open, onOpenChange, project, onPublishComplete }
   // Initialize the dialog state when it opens
   useEffect(() => {
     if (open && project) {
-      const existingUrl = project.publishedUrl;
-      const existingSlug = project.customSlug;
-      
-      if (existingUrl && existingSlug) {
-        // Project is already published - show update mode
-        setPublishedUrl(existingUrl);
-        setCustomSlug(existingSlug);
+      if (mode === "change-slug" && publishedPageData) {
+        // Change slug mode - populate with existing data
+        setCustomSlug(publishedPageData.slug || "");
+        const url = userDomain 
+          ? `https://${userDomain}/${publishedPageData.slug}` 
+          : `https://html-to-site.lovable.app/${publishedPageData.slug}`;
+        setPublishedUrl(url);
         setIsUpdatingExisting(true);
       } else {
-        // New publish
-        setPublishedUrl("");
-        setCustomSlug("");
-        setIsUpdatingExisting(false);
+        // Regular publish mode
+        const existingUrl = project.publishedUrl;
+        const existingSlug = project.customSlug;
+        
+        if (existingUrl && existingSlug) {
+          // Project is already published - show update mode
+          setPublishedUrl(existingUrl);
+          setCustomSlug(existingSlug);
+          setIsUpdatingExisting(true);
+        } else {
+          // New publish
+          setPublishedUrl("");
+          setCustomSlug("");
+          setIsUpdatingExisting(false);
+        }
       }
     }
-  }, [open, project]);
+  }, [open, project, publishedPageData, mode, userDomain]);
 
+  // Check if the slug is available for the current user
   const checkSlugAvailability = async (slug: string) => {
     try {
-      // Check if the slug is available for the current user
       const { data: existingPages, error } = await supabase
         .from('published_pages')
         .select('id, project_id, user_id')
@@ -108,6 +127,7 @@ export const PublishDialog = ({ open, onOpenChange, project, onPublishComplete }
     }
   };
 
+  // Republish the project with the new slug
   const handleRepublish = async () => {
     if (!isUpdatingExisting || !customSlug.trim() || !user) {
       return;
@@ -193,6 +213,7 @@ export const PublishDialog = ({ open, onOpenChange, project, onPublishComplete }
     }
   };
 
+  // Publish the project with the new slug
   const handlePublish = async () => {
     if (!customSlug.trim()) {
       toast({
@@ -229,17 +250,19 @@ export const PublishDialog = ({ open, onOpenChange, project, onPublishComplete }
       const slug = customSlug.trim();
       console.log('Publishing with slug:', slug);
       
-      // Check slug availability
-      const { available, error: availabilityError } = await checkSlugAvailability(slug);
-      
-      if (!available) {
-        toast({
-          title: "הסיומת לא זמינה",
-          description: availabilityError || "הסיומת כבר בשימוש",
-          variant: "destructive"
-        });
-        setIsPublishing(false);
-        return;
+      // Check slug availability (unless we're updating the same slug)
+      if (mode !== "change-slug" || publishedPageData?.slug !== slug) {
+        const { available, error: availabilityError } = await checkSlugAvailability(slug);
+        
+        if (!available) {
+          toast({
+            title: "הסיומת לא זמינה",
+            description: availabilityError || "הסיומת כבר בשימוש",
+            variant: "destructive"
+          });
+          setIsPublishing(false);
+          return;
+        }
       }
 
       // Get project title from HTML
@@ -315,10 +338,23 @@ export const PublishDialog = ({ open, onOpenChange, project, onPublishComplete }
         onPublishComplete();
       }
       
-      const actionText = isUpdatingExisting ? "עודכן" : "פורסם";
+      let actionText;
+      let successMessage;
+      
+      if (mode === "change-slug") {
+        actionText = "כתובת שונתה";
+        successMessage = `הכתובת של "${project.name}" שונתה בהצלחה`;
+      } else if (isUpdatingExisting) {
+        actionText = "עודכן";
+        successMessage = `הפרויקט "${project.name}" עודכן בהצלחה`;
+      } else {
+        actionText = "פורסם";
+        successMessage = `הפרויקט "${project.name}" פורסם בהצלחה`;
+      }
+      
       toast({
         title: `${actionText} בהצלחה! 🎉`,
-        description: `הפרויקט "${project.name}" ${isUpdatingExisting ? 'עודכן' : 'פורסם'} בהצלחה`,
+        description: successMessage,
       });
       
       setIsUpdatingExisting(true);
@@ -338,7 +374,7 @@ export const PublishDialog = ({ open, onOpenChange, project, onPublishComplete }
       }
       
       toast({
-        title: "שגיאה בפרסום",
+        title: mode === "change-slug" ? "שגיאה בשינוי כתובת" : "שגיאה בפרסום",
         description: errorMessage,
         variant: "destructive"
       });
@@ -376,12 +412,33 @@ export const PublishDialog = ({ open, onOpenChange, project, onPublishComplete }
     setIsUpdatingExisting(false);
   };
 
+  const getDialogTitle = () => {
+    if (mode === "change-slug") {
+      return "שינוי כתובת דף";
+    }
+    return isUpdatingExisting ? "עדכון פרסום" : "פרסום פרויקט";
+  };
+
+  const getPublishButtonText = () => {
+    if (isPublishing) {
+      if (mode === "change-slug") {
+        return "משנה כתובת...";
+      }
+      return isUpdatingExisting ? "מעדכן..." : "מפרסם...";
+    }
+    
+    if (mode === "change-slug") {
+      return "שנה כתובת";
+    }
+    return isUpdatingExisting ? "עדכן פרסום" : "פרסם עכשיו";
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white max-w-lg shadow-2xl">
         <DialogHeader>
           <DialogTitle className="text-3xl font-bold text-center bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            {isUpdatingExisting ? "עדכון פרסום" : "פרסום פרויקט"}
+            {getDialogTitle()}
           </DialogTitle>
         </DialogHeader>
         
@@ -396,7 +453,7 @@ export const PublishDialog = ({ open, onOpenChange, project, onPublishComplete }
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   נוצר: {new Date(project.createdAt).toLocaleDateString("he-IL")}
                 </p>
-                {isUpdatingExisting && (
+                {(isUpdatingExisting || mode === "change-slug") && (
                   <p className="text-sm text-green-600 dark:text-green-400 font-medium">
                     ✅ כבר מפורסם
                   </p>
@@ -416,14 +473,15 @@ export const PublishDialog = ({ open, onOpenChange, project, onPublishComplete }
             )}
           </div>
 
-          {!publishedUrl || !isUpdatingExisting ? (
+          {!publishedUrl || !isUpdatingExisting || mode === "change-slug" ? (
             <div className="space-y-6">
               <div className="text-center py-6">
                 <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Link size={32} className="text-white" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                  {isUpdatingExisting ? "עדכן כתובת מותאמת אישית" : "הגדר כתובת מותאמת אישית"}
+                  {mode === "change-slug" ? "שנה כתובת מותאמת אישית" : 
+                   isUpdatingExisting ? "עדכן כתובת מותאמת אישית" : "הגדר כתובת מותאמת אישית"}
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400 text-sm max-w-sm mx-auto">
                   {userDomain 
@@ -444,16 +502,16 @@ export const PublishDialog = ({ open, onOpenChange, project, onPublishComplete }
                     <Input 
                       value={customSlug} 
                       onChange={(e) => setCustomSlug(e.target.value)}
-                      placeholder={isUpdatingExisting ? "הסיומת הנוכחית" : "my-page"}
+                      placeholder={mode === "change-slug" ? "הסיומת הנוכחית" : "my-page"}
                       className="flex-1 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white font-mono"
                     />
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                     בחר סיומת ייחודית לדף שלך (רק אותיות באנגלית, מספרים ומקפים)
                   </p>
-                  {isUpdatingExisting && (
+                  {mode === "change-slug" && publishedPageData && (
                     <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                      הסיומת הנוכחית: {project.customSlug || "לא מוגדרת"}
+                      הסיומת הנוכחית: {publishedPageData.slug || "לא מוגדרת"}
                     </p>
                   )}
                 </div>
@@ -464,10 +522,10 @@ export const PublishDialog = ({ open, onOpenChange, project, onPublishComplete }
                   className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all duration-300 transform hover:scale-105 px-8 py-4 text-lg font-bold rounded-xl h-14"
                 >
                   <Share2 size={24} className="mr-3" />
-                  {isPublishing ? (isUpdatingExisting ? "מעדכן..." : "מפרסם...") : (isUpdatingExisting ? "עדכן פרסום" : "פרסם עכשיו")}
+                  {getPublishButtonText()}
                 </Button>
 
-                {isUpdatingExisting && (
+                {(isUpdatingExisting || mode === "change-slug") && mode !== "change-slug" && (
                   <Button 
                     onClick={resetToNewPublish}
                     variant="outline"
