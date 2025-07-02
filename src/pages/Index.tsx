@@ -36,29 +36,29 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white">
+      <header className="border-b border-gray-700/50 bg-gray-900/80 backdrop-blur-sm shadow-lg">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
                 HTML Editor Pro
               </h1>
-              <p className="text-gray-400 text-sm mt-1">
+              <p className="text-gray-300 text-sm mt-1">
                 עורך HTML עם תצוגה מקדימה בזמן אמת
               </p>
             </div>
             
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-sm text-gray-400">
-                <User className="w-4 h-4" />
+              <div className="flex items-center gap-2 text-sm text-gray-300 bg-gray-800/50 px-3 py-2 rounded-lg border border-gray-600">
+                <User className="w-4 h-4 text-blue-400" />
                 <span>{user?.email}</span>
               </div>
               <Button
                 onClick={handleSignOut}
-                variant="outline"
+                variant="destructive"
                 size="sm"
-                className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                className="font-medium"
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 התנתק
@@ -70,20 +70,32 @@ const Index = () => {
       
       <div className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 bg-gray-800 border-gray-700">
-            <TabsTrigger value="editor" className="flex items-center gap-2">
+          <TabsList className="grid w-full grid-cols-4 bg-gray-800/80 border-gray-600 shadow-lg backdrop-blur-sm h-12">
+            <TabsTrigger 
+              value="editor" 
+              className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-purple-600 data-[state=active]:text-white font-medium transition-all duration-200"
+            >
               <Code size={16} />
               עריכה
             </TabsTrigger>
-            <TabsTrigger value="projects" className="flex items-center gap-2">
+            <TabsTrigger 
+              value="projects" 
+              className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-600 data-[state=active]:to-emerald-600 data-[state=active]:text-white font-medium transition-all duration-200"
+            >
               <FolderOpen size={16} />
               הפרויקטים שלי
             </TabsTrigger>
-            <TabsTrigger value="published" className="flex items-center gap-2">
+            <TabsTrigger 
+              value="published" 
+              className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-yellow-500 data-[state=active]:text-white font-medium transition-all duration-200"
+            >
               <Globe2 size={16} />
               דפים מפורסמים
             </TabsTrigger>
-            <TabsTrigger value="domain" className="flex items-center gap-2">
+            <TabsTrigger 
+              value="domain" 
+              className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-500 data-[state=active]:text-white font-medium transition-all duration-200"
+            >
               <Globe size={16} />
               דומיין מותאם
             </TabsTrigger>
