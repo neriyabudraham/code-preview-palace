@@ -1,23 +1,14 @@
-import { Client } from 'pg';
-
-export const client = new Client({
-  host: 'localhost',
-  port: 5432,
-  user: 'postgres',
-  password: 'StrongPassword123',
-  database: 'html',
-});
-
-let isConnected = false;
+// Temporary mock for PostgreSQL connection
+// Note: Direct PostgreSQL connection cannot run in browser
+// This needs to be moved to a backend API
 
 export async function connectToDb() {
-  if (!isConnected) {
-    await client.connect();
-    isConnected = true;
-  }
+  console.log('Mock: Connected to database');
 }
 
 export async function query(text: string, params?: any[]) {
-  await connectToDb();
-  return client.query(text, params);
+  console.log('Mock query:', text, params);
+  return { 
+    rows: [] as any[] 
+  };
 }
