@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle, Globe, Copy, ExternalLink, Unlink, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { query } from "@/lib/db";
 import { useAuth } from "@/contexts/AuthContext";
 
 export const CustomDomainManager = () => {
@@ -30,21 +30,12 @@ export const CustomDomainManager = () => {
 
       try {
         console.log('Loading domain config for user:', user.id);
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('custom_domain, domain_verified')
-          .eq('id', user.id)
-          .maybeSingle();
+        const result = await query(
+          'SELECT custom_domain, domain_verified FROM profiles WHERE id = $1',
+          [user.id]
+        );
 
-        if (error) {
-          console.error('Error loading profile:', error);
-          toast({
-            title: "שגיאה",
-            description: "לא ניתן לטעון את הגדרות הדומיין",
-            variant: "destructive"
-          });
-          return;
-        }
+        const profile = result.rows[0];
 
         if (profile) {
           setCurrentDomain(profile.custom_domain);
@@ -126,34 +117,32 @@ export const CustomDomainManager = () => {
       console.log('Saving domain for user:', user.id, 'Domain:', fullDomain);
       
       // Use upsert to either insert or update the profile record
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          email: user.email,
-          custom_domain: fullDomain,
-          domain_verified: false,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'id'
-        });
-
-      if (error) {
-        console.error('Supabase error saving domain:', error);
-        throw error;
-      }
+      await query(`
+        INSERT INTO profiles (id, email, custom_domain, domain_verified, updated_at)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (id)
+        DO UPDATE SET 
+          custom_domain = $3,
+          domain_verified = $4,
+          updated_at = $5
+      `, [user.id, user.email, fullDomain, false, new Date().toISOString()]);
 
       setCurrentDomain(fullDomain);
       setIsDomainVerified(false);
 
       // Send webhook notification
       try {
-        await supabase.functions.invoke('domain-webhook', {
-          body: {
+        const response = await fetch('/api/supabase/functions/v1/domain-webhook', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
             userId: user.id,
             domain: fullDomain,
             action: 'domain_added'
-          }
+          })
         });
         console.log('Domain webhook sent successfully');
       } catch (webhookError) {
@@ -202,16 +191,12 @@ export const CustomDomainManager = () => {
     try {
       // For now, we'll just refresh the domain status from the database
       // In a real implementation, you'd check DNS records here
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('domain_verified')
-        .eq('id', user.id)
-        .eq('custom_domain', fullDomain)
-        .maybeSingle();
+      const result = await query(
+        'SELECT domain_verified FROM profiles WHERE id = $1 AND custom_domain = $2',
+        [user.id, fullDomain]
+      );
 
-      if (error) {
-        throw error;
-      }
+      const profile = result.rows[0];
 
       if (profile) {
         setIsDomainVerified(profile.domain_verified || false);
@@ -256,19 +241,11 @@ export const CustomDomainManager = () => {
     try {
       console.log('Disconnecting domain for user:', user.id);
       
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          custom_domain: null,
-          domain_verified: false,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
-
-      if (error) {
-        console.error('Error disconnecting domain:', error);
-        throw error;
-      }
+      await query(`
+        UPDATE profiles 
+        SET custom_domain = NULL, domain_verified = false, updated_at = $1 
+        WHERE id = $2
+      `, [new Date().toISOString(), user.id]);
 
       setCurrentDomain(null);
       setIsDomainVerified(false);

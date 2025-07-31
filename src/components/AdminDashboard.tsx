@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { query } from "@/lib/db";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,23 +29,12 @@ export function AdminDashboard() {
       if (!user) return;
 
       try {
-        const { data, error } = await supabase
-          .from('admin_users')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
+        const result = await query(
+          'SELECT id FROM admin_users WHERE user_id = $1',
+          [user.id]
+        );
 
-        if (error && error.code !== 'PGRST116') {
-          console.error('Error checking admin status:', error);
-          toast({
-            title: "שגיאה",
-            description: "אירעה שגיאה בבדיקת הרשאות מנהל",
-            variant: "destructive"
-          });
-          return;
-        }
-
-        setIsAdmin(!!data);
+        setIsAdmin(result.rows.length > 0);
       } catch (error) {
         console.error('Error checking admin status:', error);
       } finally {

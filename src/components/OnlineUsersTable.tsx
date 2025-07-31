@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { query } from "@/lib/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -22,28 +22,11 @@ export function OnlineUsersTable() {
 
   useEffect(() => {
     fetchOnlineUsers();
-    
-    // Set up real-time subscription
-    const channel = supabase
-      .channel('online-users')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_online_status'
-        },
-        () => {
-          fetchOnlineUsers();
-        }
-      )
-      .subscribe();
 
     // Update every 30 seconds to refresh status and times
     const interval = setInterval(fetchOnlineUsers, 30000);
 
     return () => {
-      supabase.removeChannel(channel);
       clearInterval(interval);
     };
   }, []);
@@ -53,15 +36,12 @@ export function OnlineUsersTable() {
       // Consider users offline if they haven't been seen in the last 2 minutes
       const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
       
-      const { data, error } = await supabase
-        .from('user_online_status')
-        .select('*')
-        .order('last_seen', { ascending: false });
+      const result = await query(
+        'SELECT * FROM user_online_status ORDER BY last_seen DESC'
+      );
 
-      if (error) throw error;
-      
       // Update the is_online status based on last_seen time
-      const updatedUsers = (data || []).map(user => ({
+      const updatedUsers = (result.rows || []).map(user => ({
         ...user,
         is_online: user.is_online && user.last_seen > twoMinutesAgo
       }));

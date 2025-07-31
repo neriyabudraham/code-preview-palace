@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { query } from "@/lib/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { BarChart3, Users, Globe, FileText, TrendingUp } from "lucide-react";
@@ -35,34 +35,33 @@ export function AdminAnalytics() {
   const fetchAnalytics = async () => {
     try {
       // Get total users from profiles table
-      const { count: usersCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
+      const usersResult = await query('SELECT COUNT(*) FROM profiles');
+      const usersCount = parseInt(usersResult.rows[0].count);
 
       // Get total projects
-      const { count: projectsCount } = await supabase
-        .from('user_projects')
-        .select('*', { count: 'exact', head: true });
+      const projectsResult = await query('SELECT COUNT(*) FROM user_projects');
+      const projectsCount = parseInt(projectsResult.rows[0].count);
 
       // Get total published pages
-      const { count: publishedCount } = await supabase
-        .from('published_pages')
-        .select('*', { count: 'exact', head: true });
+      const publishedResult = await query('SELECT COUNT(*) FROM published_pages');
+      const publishedCount = parseInt(publishedResult.rows[0].count);
 
       // Get total page visits
-      const { count: visitsCount } = await supabase
-        .from('page_visits')
-        .select('*', { count: 'exact', head: true });
+      const visitsResult = await query('SELECT COUNT(*) FROM page_visits');
+      const visitsCount = parseInt(visitsResult.rows[0].count);
 
       // Get recent popular pages
-      const { data: recentVisits } = await supabase
-        .from('page_visits')
-        .select(`
-          slug,
-          published_pages!inner(title)
-        `)
-        .order('visited_at', { ascending: false })
-        .limit(100);
+      const recentVisitsResult = await query(`
+        SELECT 
+          pv.slug,
+          pp.title
+        FROM page_visits pv
+        INNER JOIN published_pages pp ON pv.published_page_id = pp.id
+        ORDER BY pv.visited_at DESC
+        LIMIT 100
+      `);
+
+      const recentVisits = recentVisitsResult.rows;
 
       // Process recent visits to group by slug
       const visitCounts: { [key: string]: { slug: string; title: string | null; visits: number } } = {};
@@ -74,7 +73,7 @@ export function AdminAnalytics() {
         } else {
           visitCounts[slug] = {
             slug,
-            title: (visit.published_pages as any)?.title || null,
+            title: visit.title || null,
             visits: 1
           };
         }

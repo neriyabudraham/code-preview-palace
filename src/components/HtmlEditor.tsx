@@ -9,7 +9,7 @@ import { Save, Play, RotateCcw, Copy, Share2, FileText, Trash2, ExternalLink, Re
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { query } from "@/lib/db";
 
 const EMPTY_HTML = "";
 
@@ -71,20 +71,12 @@ export const HtmlEditor = () => {
     }
 
     try {
-      const { data: publishedPage, error } = await supabase
-        .from('published_pages')
-        .select('slug, custom_domain, title, created_at, updated_at')
-        .eq('project_id', projectId)
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const result = await query(
+        'SELECT slug, custom_domain, title, created_at, updated_at FROM published_pages WHERE project_id = $1 AND user_id = $2',
+        [projectId, user.id]
+      );
 
-      if (error) {
-        console.error('Error checking publish status:', error);
-        setIsProjectPublished(false);
-        setPublishedPageData(null);
-        return false;
-      }
-
+      const publishedPage = result.rows[0];
       const isPublished = !!publishedPage;
       setIsProjectPublished(isPublished);
       setPublishedPageData(publishedPage);
@@ -668,19 +660,11 @@ export const HtmlEditor = () => {
       const titleMatch = htmlCode.match(/<title[^>]*>([^<]+)<\/title>/i);
       const title = titleMatch ? titleMatch[1] : fileName || "ללא כותרת";
 
-      const { error } = await supabase
-        .from('published_pages')
-        .update({
-          title,
-          html_content: htmlCode,
-          updated_at: new Date().toISOString()
-        })
-        .eq('project_id', currentProjectId)
-        .eq('user_id', user.id);
-
-      if (error) {
-        throw error;
-      }
+      await query(`
+        UPDATE published_pages 
+        SET title = $1, html_content = $2, updated_at = $3 
+        WHERE project_id = $4 AND user_id = $5
+      `, [title, htmlCode, new Date().toISOString(), currentProjectId, user.id]);
 
       // Update project in localStorage
       const savedProjects = JSON.parse(localStorage.getItem(getUserProjectsKey()) || "[]");

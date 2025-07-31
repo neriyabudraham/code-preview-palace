@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { query } from "@/lib/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -36,13 +36,11 @@ export function AdminUsersList() {
 
   const fetchAdminUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('admin_users')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const result = await query(
+        'SELECT * FROM admin_users ORDER BY created_at DESC'
+      );
 
-      if (error) throw error;
-      setAdminUsers(data || []);
+      setAdminUsers(result.rows || []);
     } catch (error) {
       console.error('Error fetching admin users:', error);
       toast({
@@ -67,22 +65,13 @@ export function AdminUsersList() {
 
     setIsAddingAdmin(true);
     try {
-      // First, check if user exists in auth.users
-      const { data: userData, error: userError } = await (supabase as any).rpc('get_user_by_email', {
-        email_input: newAdminEmail
-      });
+      // First, check if user exists in profiles
+      const userResult = await query(
+        'SELECT id, email FROM profiles WHERE email = $1',
+        [newAdminEmail.trim()]
+      );
 
-      if (userError) {
-        console.error('Error fetching user:', userError);
-        toast({
-          title: "שגיאה",
-          description: "אירעה שגיאה בחיפוש המשתמש",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      if (!userData || userData.length === 0) {
+      if (userResult.rows.length === 0) {
         toast({
           title: "שגיאה",
           description: "משתמש עם כתובת אימייל זו לא נמצא במערכת",
@@ -91,28 +80,28 @@ export function AdminUsersList() {
         return;
       }
 
-      const user = userData[0];
+      const userData = userResult.rows[0];
 
-      // Add to admin_users table
-      const { error } = await supabase
-        .from('admin_users')
-        .insert({
-          user_id: user.id,
-          email: newAdminEmail.trim()
+      // Check if already an admin
+      const adminCheckResult = await query(
+        'SELECT id FROM admin_users WHERE user_id = $1',
+        [userData.id]
+      );
+
+      if (adminCheckResult.rows.length > 0) {
+        toast({
+          title: "שגיאה",
+          description: "משתמש זה כבר מנהל במערכת",
+          variant: "destructive"
         });
-
-      if (error) {
-        if (error.code === '23505') {
-          toast({
-            title: "שגיאה",
-            description: "משתמש זה כבר מנהל במערכת",
-            variant: "destructive"
-          });
-        } else {
-          throw error;
-        }
         return;
       }
+
+      // Add to admin_users table
+      await query(
+        'INSERT INTO admin_users (user_id, email) VALUES ($1, $2)',
+        [userData.id, userData.email]
+      );
 
       toast({
         title: "הצלחה",
@@ -140,12 +129,7 @@ export function AdminUsersList() {
     }
 
     try {
-      const { error } = await supabase
-        .from('admin_users')
-        .delete()
-        .eq('id', adminId);
-
-      if (error) throw error;
+      await query('DELETE FROM admin_users WHERE id = $1', [adminId]);
 
       toast({
         title: "הצלחה",
